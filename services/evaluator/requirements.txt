@@ -1,0 +1,3 @@
+python-dotenv
+
+git+https://github.com/Manga-ai-project/toolbox-logging.git
