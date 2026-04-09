@@ -206,6 +206,8 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-
 # Custom
 .idea
+rabbit/definitions.json
+rabbit/rabbit.env
+vllm/vllm.env

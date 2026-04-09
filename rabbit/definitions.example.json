@@ -1,0 +1,54 @@
+{
+  "vhosts": [
+    { "name": "/" },
+    { "name": "/fluence_translation" }
+  ],
+
+  "users": [
+    { "name": "fluence_rabbit_admin", "password": "rabbit_changeme", "tags": "administrator" },
+    { "name": "fluence_service_tl", "password": "rabbit_changeme", "tags": "" }
+  ],
+
+  "permissions": [
+    {
+      "user": "fluence_rabbit_admin",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    },
+
+    {
+      "user": "fluence_service_tl",
+      "vhost": "/fluence_translation",
+      "configure": ".*",
+      "write": "^fluence_translation\\.topic$",
+      "read": "^q\\.incoming_tasks$"
+    }
+  ],
+
+  "queues": [
+    { "name": "q.incoming_tasks", "vhost": "/fluence_translation", "durable": true, "arguments": {} }
+  ],
+
+  "exchanges": [
+    {
+      "name": "fluence_translation.topic",
+      "vhost": "/fluence_translation",
+      "type": "topic",
+      "durable": true,
+      "arguments": {}
+    }
+  ],
+
+  "bindings": [
+    {
+      "source": "fluence_translation.topic",
+      "vhost": "/fluence_translation",
+      "destination": "q.incoming_tasks",
+      "destination_type": "queue",
+      "routing_key": "to.in_gateway",
+      "arguments": {}
+    }
+  ]
+}

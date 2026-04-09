@@ -1,6 +1,7 @@
 services:
   vllm:
     image: vllm/vllm-openai:latest
+    container_name: vllm-fluence
     ports:
       - "8000:8000"
     volumes:
@@ -20,6 +21,7 @@ services:
       "--enable-prefix-caching",
       "--log-level debug",
     ]
+    restart: unless-stopped
     deploy:
       resources:
         reservations:
@@ -32,3 +34,34 @@ services:
       interval: 60s
       timeout: 3s
       retries: 6
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: rabbitmq-fluence
+    ports:
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # Web UI
+    env_file:
+      - rabbit/rabbit.env
+    environment:
+      RABBITMQ_LOAD_DEFINITIONS: "true"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq:rw
+      - ./rabbit/definitions.json:/opt/definitions.json:ro
+      - ./rabbit/rabbitmq.config:/etc/rabbitmq/rabbitmq.config:ro
+    restart: unless-stopped
+
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics","ping" ]
+      interval: 1m
+      timeout: 30s
+      retries: 5
+      start_period: 10s
+
+networks:
+  fluence-net:
+    name: test-net
+    driver: bridge
+
+volumes:
+  rabbitmq_data:
