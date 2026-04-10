@@ -5,6 +5,7 @@ torchvision==0.24.1+cu130
 
 
 git+https://github.com/Manga-ai-project/toolbox-logging.git
+git+https://github.com/Manga-ai-project/toolbox-rabbitmq.git
 
 python-dotenv
 transformers

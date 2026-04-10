@@ -1,0 +1,13 @@
+import torch.cuda
+
+
+def healthcheck(logger) -> bool:
+    try:
+        if not torch.cuda.is_available():
+            raise Exception('No GPU available')
+
+        return True
+
+    except Exception as e:
+        logger.error(e)
+        return False
