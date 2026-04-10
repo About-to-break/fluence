@@ -58,6 +58,22 @@ services:
       retries: 5
       start_period: 10s
 
+  nmt_translator:
+    build:
+      context: services/machine_translator
+      dockerfile: Dockerfile.machine_translator
+    container_name: nmt_translator
+    env_file:
+      - .env
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
+
 networks:
   fluence-net:
     name: test-net
