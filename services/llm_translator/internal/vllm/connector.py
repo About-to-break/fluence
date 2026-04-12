@@ -1,0 +1,2 @@
+class SomeLLMError(Exception):
+    pass
