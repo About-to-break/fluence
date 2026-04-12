@@ -26,7 +26,7 @@ def serve():
             logging.info("Health check is done")
         else:
             logging.error("Health check failed")
-            raise SystemExit(1)
+            raise EnvironmentError
 
         if config.PIPELINE == "prod":
             logging.info("Set to production pipeline\n Downloading model...")
@@ -34,11 +34,15 @@ def serve():
                 source_language=config.NMT_SRC_LANG,
                 target_language=config.NMT_TGT_LANG,
                 model_name=config.NMT_MODEL,
-                max_tokens=config.NMT_MAX_NEW_TOKENS
+                max_new_tokens=config.NMT_MAX_NEW_TOKENS,
+                max_length=config.NMT_MAX_LENGTH,
+
             )
         elif config.PIPELINE == "test":
             logging.info("Set to test pipeline")
             translator = None
+        else:
+            raise ValueError("Pipeline type not supported")
 
         active_pipeline = pipeline.get_pipeline(config)
 
@@ -87,8 +91,10 @@ def serve():
         executor.shutdown(wait=True)
 
     except KeyboardInterrupt:
+        logging.info("Shutting down")
         return
-    except Exception:
+    except Exception as e:
+        logging.exception(f"Critical error: {e}")
         return
 
 
