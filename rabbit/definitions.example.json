@@ -6,7 +6,11 @@
 
   "users": [
     { "name": "fluence_rabbit_admin", "password": "rabbit_changeme", "tags": "administrator" },
-    { "name": "fluence_service_tl", "password": "rabbit_changeme", "tags": "" }
+    { "name": "fluence_router_stl", "password": "rabbit_changeme", "tags": "" },
+    { "name": "fluence_api_gateway_stl", "password": "rabbit_changeme", "tags": "" },
+    { "name": "fluence_nmt_stl", "password": "rabbit_changeme", "tags": "" },
+    { "name": "fluence_llm_stl", "password": "rabbit_changeme", "tags": "" },
+    { "name": "fluence_ez_stl", "password": "rabbit_changeme", "tags": "" }
   ],
 
   "permissions": [
@@ -19,16 +23,60 @@
     },
 
     {
-      "user": "fluence_service_tl",
+      "user": "fluence_rabbit_admin",
+      "vhost": "/fluence_translation",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    },
+
+    {
+      "user": "fluence_router_stl",
       "vhost": "/fluence_translation",
       "configure": ".*",
       "write": "^fluence_translation\\.topic$",
-      "read": "^q\\.incoming_tasks$"
+      "read": "^q\\.in_gateway$"
+    },
+
+    {
+      "user": "fluence_api_gateway_stl",
+      "vhost": "/fluence_translation",
+      "configure": ".*",
+      "write": "^fluence_translation\\.topic$",
+      "read": "^q\\.out_gateway$"
+    },
+
+    {
+      "user": "fluence_nmt_stl",
+      "vhost": "/fluence_translation",
+      "configure": ".*",
+      "write": "^fluence_translation\\.topic$",
+      "read": "^q\\.router_to_nmt$"
+    },
+
+    {
+      "user": "fluence_llm_stl",
+      "vhost": "/fluence_translation",
+      "configure": ".*",
+      "write": "^fluence_translation\\.topic$",
+      "read": "^q\\.nmt_to_llm$"
+    },
+
+    {
+      "user": "fluence_ez_stl",
+      "vhost": "/fluence_translation",
+      "configure": ".*",
+      "write": "^fluence_translation\\.topic$",
+      "read": "^q\\.router_to_ez$"
     }
   ],
 
   "queues": [
-    { "name": "q.incoming_tasks", "vhost": "/fluence_translation", "durable": true, "arguments": {} }
+    { "name": "q.in_gateway", "vhost": "/fluence_translation", "durable": true, "arguments": {} },
+    { "name": "q.router_to_nmt", "vhost": "/fluence_translation", "durable": true, "arguments": {} },
+    { "name": "q.router_to_ez", "vhost": "/fluence_translation", "durable": true, "arguments": {} },
+    { "name": "q.nmt_to_llm", "vhost": "/fluence_translation", "durable": true, "arguments": {} },
+    { "name": "q.out_gateway", "vhost": "/fluence_translation", "durable": true, "arguments": {} }
   ],
 
   "exchanges": [
@@ -45,9 +93,45 @@
     {
       "source": "fluence_translation.topic",
       "vhost": "/fluence_translation",
-      "destination": "q.incoming_tasks",
+      "destination": "q.in_gateway",
       "destination_type": "queue",
       "routing_key": "to.in_gateway",
+      "arguments": {}
+    },
+
+    {
+      "source": "fluence_translation.topic",
+      "vhost": "/fluence_translation",
+      "destination": "q.router_to_nmt",
+      "destination_type": "queue",
+      "routing_key": "to.router_to_nmt",
+      "arguments": {}
+    },
+
+    {
+      "source": "fluence_translation.topic",
+      "vhost": "/fluence_translation",
+      "destination": "q.router_to_ez",
+      "destination_type": "queue",
+      "routing_key": "to.router_to_ez",
+      "arguments": {}
+    },
+
+    {
+      "source": "fluence_translation.topic",
+      "vhost": "/fluence_translation",
+      "destination": "q.nmt_to_llm",
+      "destination_type": "queue",
+      "routing_key": "to.nmt_to_llm",
+      "arguments": {}
+    },
+
+    {
+      "source": "fluence_translation.topic",
+      "vhost": "/fluence_translation",
+      "destination": "q.out_gateway",
+      "destination_type": "queue",
+      "routing_key": "to.out_gateway",
       "arguments": {}
     }
   ]

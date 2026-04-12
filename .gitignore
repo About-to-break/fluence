@@ -210,4 +210,5 @@ __marimo__/
 .idea
 rabbit/definitions.json
 rabbit/rabbit.env
-vllm/vllm.env
+.env
+docker-compose.test.yml

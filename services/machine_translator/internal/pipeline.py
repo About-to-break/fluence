@@ -27,7 +27,7 @@ def run_pipeline(translator: MachineTranslator, message: bytes):
 
     return new_message
 
-def run_test_pipeline(translator: MachineTranslator, message: bytes):
+def run_test_pipeline(translator, message: bytes):
     logging.debug(f"Test pipeline worked")
     return message
 

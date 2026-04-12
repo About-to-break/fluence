@@ -93,12 +93,12 @@ class RabbitConsumer(MessageConsumer):
         await self._consumer.consume(handler)
 
 def get_broker(config: SimpleNamespace):
-    if config.BROKER == "rabbit":
+    if config.MESSAGE_BROKER == "rabbitmq":
         return {
             "producer": RabbitProducer(config),
             "consumer": RabbitConsumer(config)
         }
-    elif config.BROKER == "kafka":
+    elif config.MESSAGE_BROKER == "kafka":
         return {
             "producer": KafkaProducer(config),
             "consumer": KafkaConsumer(config)
