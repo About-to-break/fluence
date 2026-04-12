@@ -10,3 +10,4 @@ git+https://github.com/Manga-ai-project/toolbox-rabbitmq.git
 python-dotenv
 transformers
 sentencepiece
+accelerate
