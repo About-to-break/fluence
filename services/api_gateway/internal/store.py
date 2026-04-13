@@ -33,12 +33,15 @@ class InMemoryJobStore:
         self,
         job_uuid: str,
         status: JobStatus,
+        lamport_ts: int | None = None,
         translated_text: str | None = None,
         error_detail: str | None = None,
     ) -> JobRecord:
         with self._lock:
             job = self._jobs[job_uuid]
             job.status = status
+            if lamport_ts is not None:
+                job.lamport_ts = lamport_ts
             job.translated_text = translated_text
             job.error_detail = error_detail
             return job

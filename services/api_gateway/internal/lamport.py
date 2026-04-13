@@ -10,3 +10,8 @@ class LamportClock:
         with self._lock:
             self._value += 1
             return self._value
+
+    def update(self, remote_ts: int) -> int:
+        with self._lock:
+            self._value = max(self._value, remote_ts) + 1
+            return self._value

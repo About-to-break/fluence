@@ -41,6 +41,7 @@ def _resolve_consumer(
 
 def apply_output_payload(
     job_store: InMemoryJobStore,
+    clock: LamportClock,
     payload: dict,
 ):
     job_uuid = payload.get("uuid")
@@ -53,12 +54,18 @@ def apply_output_payload(
         logging.warning("Skipping q.out_gateway payload for unknown job %s", job_uuid)
         return None
 
+    remote_lamport_ts = payload.get("lamport_ts")
+    local_lamport_ts = None
+    if isinstance(remote_lamport_ts, int):
+        local_lamport_ts = clock.update(remote_lamport_ts)
+
     error_detail = payload.get("error_detail") or payload.get("error")
     status_value = payload.get("status")
     if isinstance(status_value, str) and status_value.lower() in {"failed", "error"}:
         return job_store.set_result(
             job_uuid,
             JobStatus.FAILED,
+            lamport_ts=local_lamport_ts,
             translated_text=None,
             error_detail=str(error_detail or "Translation failed"),
         )
@@ -71,6 +78,7 @@ def apply_output_payload(
         return job_store.set_result(
             job_uuid,
             JobStatus.COMPLETED,
+            lamport_ts=local_lamport_ts,
             translated_text=translated_text,
             error_detail=None,
         )
@@ -79,6 +87,7 @@ def apply_output_payload(
         return job_store.set_result(
             job_uuid,
             JobStatus.FAILED,
+            lamport_ts=local_lamport_ts,
             translated_text=None,
             error_detail=str(error_detail),
         )
@@ -110,7 +119,7 @@ def create_app(
                 logging.warning("Skipping malformed q.out_gateway payload")
                 return
 
-            apply_output_payload(job_store, payload)
+            apply_output_payload(job_store, clock, payload)
 
         async def run_output_consumer():
             if message_consumer is None:
