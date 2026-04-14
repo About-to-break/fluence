@@ -1,18 +1,44 @@
 import json
 import logging
 from types import SimpleNamespace
+from .vllm.connector import *
 
 
 class EmptyPayloadError(Exception):
     pass
 
-
-def run_pipeline(message: bytes):
-    logging.info(f"Still empty")
-    return message
+class EmptyResponseError(Exception):
+    pass
 
 
-def run_test_pipeline(message: bytes):
+async def run_pipeline(connector: VLLMConnector, max_tokens: int, message: bytes):
+    parsed_body = json.loads(message.decode("utf-8"))
+    text = parsed_body["text"]
+    uuid = parsed_body["uuid"]
+
+    logging.info(f"Decoded body with uuid {uuid} and text {text}")
+
+    if text == "" or uuid == "":
+        raise EmptyPayloadError("Empty payload")
+
+    logging.info(f"Requesting translation...")
+    try:
+        translation = await connector.translate(prompt=text, max_tokens=max_tokens)
+
+        if translation == "":
+            raise EmptyResponseError(f"Generated empty translation for {text}")
+
+        logging.info(f"Translated text: {translation}")
+
+        new_message = json.dumps({"uuid": uuid, "text": translation}).encode("utf-8")
+
+        return new_message
+
+    except VLLMTimeoutError as e:
+        raise VLLMTimeoutError(f"Encountered vLLM timeout error with {uuid}, fallbacking to nmt...") from e
+
+
+async def run_test_pipeline(connector: VLLMConnector, max_tokens: int, message: bytes):
     logging.info(f"Test pipeline worked")
     return message
 

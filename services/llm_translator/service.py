@@ -1,15 +1,13 @@
 import logging
-from concurrent.futures import ThreadPoolExecutor
-from functools import partial
 import asyncio
 from logging_tools import configure_global_logging
-from config import load_config
+from config import load_config, get_prompt
 from internal.misc import queue
-from internal.vllm.connector import SomeLLMError
+from internal.vllm.connector import *
 from internal import pipeline
 
 
-def serve():
+async def serve():
     try:
         config = load_config()
 
@@ -21,65 +19,86 @@ def serve():
         logging.debug(config)
 
         if config.PIPELINE == "prod":
-            logging.info("Set to production pipeline\n Downloading model...")
+            logging.info(f"Production pipeline with system prompt: {config.SYSTEM_PROMPT[:50]}...")
+            system_prompt = get_prompt(config.SYSTEM_PROMPT)
+            vllm_connector = await VLLMConnector.get_instance(
+                base_url=config.OPENAI_API_BASE_URL,
+                model=config.OPENAI_API_MODEL,
+                api_key=config.OPENAI_API_KEY,
+                timeout=config.OPENAI_API_TIMEOUT,
+                max_retries=config.OPENAI_API_MAX_RETRIES,
+                max_concurrency=config.OPENAI_API_MAX_CONCURRENCY,
+                system_messages=system_prompt
+            )
         elif config.PIPELINE == "test":
-            logging.info("Set to test pipeline")
+            logging.info("Test pipeline")
+            system_prompt = None
+            vllm_connector = None
         else:
-            raise ValueError("Pipeline type not supported")
+            raise ValueError("Unsupported pipeline type")
 
         active_pipeline = pipeline.get_pipeline(config)
-
         broker = queue.get_broker(config)
-
         producer = broker["producer"]
         consumer = broker["consumer"]
 
-        semaphore = asyncio.Semaphore(1)
-        executor = ThreadPoolExecutor(max_workers=1)
+        await producer.connect()
 
-        logging.info("Server started")
+        # Семафор для graceful shutdown, а не для ограничения конкурентности
+        shutdown_event = asyncio.Event()
 
         async def handler(message):
-            async with semaphore:
-                loop = asyncio.get_running_loop()
+            """Асинхронный обработчик — конкурентность управляется семафором в VLLMConnector"""
+            try:
+                result = await active_pipeline(
+                    vllm_connector,
+                    config.OPENAI_API_MAX_TOKENS,
+                    message.body
+                )
 
-                try:
-                    func = partial(active_pipeline, message.body)
+                await producer.produce(result)
+                logging.debug(f"Successfully processed message")
 
-                    result = await loop.run_in_executor(
-                        executor,
-                        func
-                    )
+            except pipeline.EmptyPayloadError as e0:
+                logging.warning(f"Empty payload, discarding: {e0}")
+                # Ack — плохое сообщение удаляем из очереди
 
-                    # all good do ack
-                    await producer.produce(result)
+            except pipeline.EmptyResponseError as e1:
+                logging.error(f"Empty response, sending original: {e1}")
+                # Отправляем оригинальное сообщение как fallback
+                await producer.produce(message.body)
 
-                except pipeline.EmptyPayloadError as e0:
-                    logging.warning(f"Empty payload: {e0}")
-                    # do ack to kill bad message
-                    raise ValueError(f"Empty payload: {e0}")
-                except SomeLLMError as e1:
-                    logging.error(f"Translation empty: {e1}")
-                    # do ack because it is our error
-                    raise
-                except Exception as e2:
-                    logging.exception(f"Unexpected error: {e2}")
-                    # do nack cause its unexpected our error
-                    raise
+            except VLLMTimeoutError as te:
+                logging.warning(f"vLLM timeout, fallback to original: {te}")
+                # Отправляем то, что было до вызова LLM (оригинал из очереди)
+                await producer.produce(message.body)
+
+            except Exception as e2:
+                logging.exception(f"Unexpected error, requeue: {e2}")
+                # Nack с requeue — пусть другая реплика попробует
+                raise  # Пробрасываем для nack в consumer'е
 
         async def main():
             await consumer.start_consuming(handler=handler)
 
-        asyncio.run(main())
-        executor.shutdown(wait=True)
+            # Ждем сигнала завершения
+            await shutdown_event.wait()
 
-    except KeyboardInterrupt:
-        logging.info("Shutting down")
-        return
+        # Запускаем с обработкой graceful shutdown
+        try:
+            await main()
+        except KeyboardInterrupt:
+            logging.info("Received shutdown signal")
+            shutdown_event.set()
+        finally:
+            # await consumer.close()
+            # await producer.close()
+            logging.info("Graceful shutdown complete")
+
     except Exception as e:
         logging.exception(f"Critical error: {e}")
-        return
+        raise
 
 
 if __name__ == '__main__':
-    serve()
+    asyncio.run(serve())
