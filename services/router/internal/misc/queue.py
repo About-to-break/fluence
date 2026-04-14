@@ -73,7 +73,7 @@ class RabbitProducer(MessageProducer):
         self._producer = async_rabbitmq.RabbitProducerAIO(
             uri=config.RABBITMQ_URI,
             exchange=config.RABBITMQ_EXCHANGE,
-            key=config.RABBITMQ_KEY,
+            key=config.RABBITMQ_ROUTING_KEY,
             retries=config.RABBITMQ_RETRIES,
         )
 

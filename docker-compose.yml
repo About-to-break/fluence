@@ -91,6 +91,20 @@ services:
               count: all
               capabilities: [ gpu ]
 
+    llm_translator:
+      build:
+        context: services/llm_translator
+        dockerfile: Dockerfile.llm_translator
+      container_name: llm_translator
+      env_file:
+        - .env
+      restart: unless-stopped
+      depends_on:
+        rabbitmq:
+          condition: service_healthy
+        vllm:
+          condition: service_healthy
+
 networks:
   fluence-net:
     name: test-net
