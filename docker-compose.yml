@@ -105,6 +105,16 @@ services:
         vllm:
           condition: service_healthy
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+
 networks:
   fluence-net:
     name: test-net
@@ -112,3 +122,4 @@ networks:
 
 volumes:
   rabbitmq_data:
+  prometheus_data:

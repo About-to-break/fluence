@@ -1,0 +1,36 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - localhost:9090
+
+  # Future service scrapes: enable only after metrics endpoints and ports are defined..
+  # - job_name: api_gateway
+  #   scrape_interval: 3s
+  #   metrics_path: /metrics
+  #   static_configs:
+  #     - targets: ["api_gateway:<port>"]
+
+  # - job_name: router
+  #   scrape_interval: 3s
+  #   metrics_path: /metrics
+  #   static_configs:
+  #     - targets: ["router:<port>"]
+
+  # - job_name: nmt_translator
+  #   scrape_interval: 3s
+  #   metrics_path: /metrics
+  #   static_configs:
+  #     - targets: ["nmt_translator:<port>"]
+
+  # - job_name: llm_services
+  #   scrape_interval: 3s
+  #   metrics_path: /metrics
+  #   static_configs:
+  #     - targets:
+  #         - "llm_translator:<port>"
+  #         - "vllm:<port>"
