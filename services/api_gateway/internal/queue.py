@@ -53,7 +53,7 @@ class RabbitConsumer(MessageConsumer):
     def __init__(self, config: SimpleNamespace):
         self._consumer = async_rabbitmq.RabbitConsumerAIO(
             uri=config.RABBITMQ_URI,
-            prefetch_count=1,
+            prefetch_count=config.RABBITMQ_OUTPUT_PREFETCH_COUNT,
             queue=config.RABBITMQ_OUTPUT_QUEUE,
         )
 
