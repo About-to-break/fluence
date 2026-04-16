@@ -96,6 +96,45 @@ def apply_output_payload(
     return None
 
 
+async def _safe_ack(message) -> None:
+    ack = getattr(message, "ack", None)
+    if ack is None:
+        return
+
+    await ack()
+
+
+async def _safe_nack(message, requeue: bool = True) -> None:
+    nack = getattr(message, "nack", None)
+    if nack is None:
+        return
+
+    await nack(requeue=requeue)
+
+
+async def process_output_message(
+    message,
+    job_store: InMemoryJobStore,
+    clock: LamportClock,
+):
+    try:
+        payload = json.loads(message.body.decode("utf-8"))
+    except (AttributeError, UnicodeDecodeError, json.JSONDecodeError):
+        logging.warning("Skipping malformed q.out_gateway payload")
+        await _safe_ack(message)
+        return None
+
+    try:
+        result = apply_output_payload(job_store, clock, payload)
+    except Exception:
+        logging.exception("Failed to process q.out_gateway payload")
+        await _safe_nack(message, requeue=True)
+        return None
+
+    await _safe_ack(message)
+    return result
+
+
 def create_app(
     config: SimpleNamespace,
     producer: MessageProducer | None = None,
@@ -113,13 +152,7 @@ def create_app(
         consumer_task = None
 
         async def handle_output_message(message):
-            try:
-                payload = json.loads(message.body.decode("utf-8"))
-            except (AttributeError, UnicodeDecodeError, json.JSONDecodeError):
-                logging.warning("Skipping malformed q.out_gateway payload")
-                return
-
-            apply_output_payload(job_store, clock, payload)
+            await process_output_message(message, job_store, clock)
 
         async def run_output_consumer():
             if message_consumer is None:
