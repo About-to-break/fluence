@@ -1,3 +1,7 @@
+'''
+Deprecated, use .ct2nmt instead
+'''
+
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from typing import List
 import logging
