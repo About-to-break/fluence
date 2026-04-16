@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import sys
 from logging_tools import configure_global_logging
 from config import load_config, get_prompt
 from internal.misc import queue
@@ -44,11 +45,11 @@ async def serve():
 
         await producer.connect()
 
-        # Семафор для graceful shutdown, а не для ограничения конкурентности
         shutdown_event = asyncio.Event()
+        logging.info("Server started")
 
+        # ========== ОСНОВНОЙ HANDLER ==========
         async def handler(message):
-            """Асинхронный обработчик — конкурентность управляется семафором в VLLMConnector"""
             try:
                 result = await active_pipeline(
                     vllm_connector,
@@ -57,42 +58,52 @@ async def serve():
                 )
 
                 await producer.produce(result)
+                await message.ack()
                 logging.debug(f"Successfully processed message")
+                return result
 
             except pipeline.EmptyPayloadError as e0:
                 logging.warning(f"Empty payload, discarding: {e0}")
-                # Ack — плохое сообщение удаляем из очереди
+                await message.nack(requeue=False)
+                return None
 
             except pipeline.EmptyResponseError as e1:
                 logging.error(f"Empty response, sending original: {e1}")
-                # Отправляем оригинальное сообщение как fallback
                 await producer.produce(message.body)
+                await message.ack()
+                return message.body.decode()
 
             except VLLMTimeoutError as te:
                 logging.warning(f"vLLM timeout, fallback to original: {te}")
-                # Отправляем то, что было до вызова LLM (оригинал из очереди)
                 await producer.produce(message.body)
+                await message.ack()
+                return message.body.decode()
+
+            except VLLMConnectionError as ce:
+                logging.error(f"vLLM connection error, requeue: {ce}")
+                await message.nack(requeue=True)
+                raise
 
             except Exception as e2:
                 logging.exception(f"Unexpected error, requeue: {e2}")
-                # Nack с requeue — пусть другая реплика попробует
-                raise  # Пробрасываем для nack в consumer'е
+                await message.nack(requeue=True)
+                raise
+
+        # ========== FIRE-AND-FORGET ОБЁРТКА ==========
+        async def background_handler(message):
+            """Запускает handler в фоне, не дожидаясь результата."""
+            asyncio.create_task(handler(message))
 
         async def main():
-            await consumer.start_consuming(handler=handler)
-
-            # Ждем сигнала завершения
+            await consumer.start_consuming(handler=background_handler)
             await shutdown_event.wait()
 
-        # Запускаем с обработкой graceful shutdown
         try:
             await main()
         except KeyboardInterrupt:
             logging.info("Received shutdown signal")
             shutdown_event.set()
         finally:
-            # await consumer.close()
-            # await producer.close()
             logging.info("Graceful shutdown complete")
 
     except Exception as e:
@@ -101,4 +112,9 @@ async def serve():
 
 
 if __name__ == '__main__':
+    if sys.platform != "win32":
+        import uvloop
+
+        uvloop.install()
+
     asyncio.run(serve())
