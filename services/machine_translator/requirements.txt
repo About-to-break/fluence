@@ -1,13 +1,12 @@
---extra-index-url https://download.pytorch.org/whl/cu130
-
-torch==2.9.1+cu130
-torchvision==0.24.1+cu130
-
-
-git+https://github.com/Manga-ai-project/toolbox-logging.git
-git+https://github.com/Manga-ai-project/toolbox-rabbitmq.git
-
+torch
+torchvision
+uvloop
+ctranslate2
+huggingface_hub
 python-dotenv
 transformers
 sentencepiece
 accelerate
+
+git+https://github.com/Manga-ai-project/toolbox-logging.git
+git+https://github.com/Manga-ai-project/toolbox-rabbitmq.git

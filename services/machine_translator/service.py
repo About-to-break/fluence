@@ -1,16 +1,14 @@
+import sys
 import logging
-from concurrent.futures import ThreadPoolExecutor
-from functools import partial
 import asyncio
 from logging_tools import configure_global_logging
 from config import load_config
-from internal.misc import healthcheck
 from internal.misc import queue
-from internal.nmt import nmt
+from internal.nmt import nmt, ct2nmt
 from internal import pipeline
 
 
-def serve():
+async def serve():
     try:
         config = load_config()
 
@@ -21,13 +19,6 @@ def serve():
 
         logging.debug(config)
 
-        logging.info("Performing health check...")
-        if healthcheck.healthcheck():
-            logging.info("Health check is done")
-        else:
-            logging.error("Health check failed")
-            raise EnvironmentError
-
         if config.PIPELINE == "prod":
             logging.info("Set to production pipeline\n Downloading model...")
             translator = nmt.MachineTranslator(
@@ -36,67 +27,90 @@ def serve():
                 model_name=config.NMT_MODEL,
                 max_new_tokens=config.NMT_MAX_NEW_TOKENS,
                 max_length=config.NMT_MAX_LENGTH,
-
             )
         elif config.PIPELINE == "test":
             logging.info("Set to test pipeline")
             translator = None
+        elif config.PIPELINE == "batch":
+            logging.info("Set to batch pipeline")
+            ct2nmt.download_model(
+                hf_model_repo=config.CT2NMT_MODEL_REPO,
+                target_dir=config.CT2NMT_MODEL_DIR,
+                token=config.HF_TOKEN,
+            )
+            translator = ct2nmt.CT2Translator(
+                model_path=config.CT2NMT_MODEL_DIR,
+                tgt_lang=config.CT2NMT_TGT_LANG,
+                src_lang=config.CT2NMT_SRC_LANG,
+            )
+            logging.info(f"Set to translate {config.CT2NMT_SRC_LANG} to {config.CT2NMT_TGT_LANG}")
         else:
             raise ValueError("Pipeline type not supported")
 
         active_pipeline = pipeline.get_pipeline(config)
-
         broker = queue.get_broker(config)
-
         producer = broker["producer"]
         consumer = broker["consumer"]
 
-        semaphore = asyncio.Semaphore(1)
-        executor = ThreadPoolExecutor(max_workers=1)
+        await producer.connect()
 
+        shutdown_event = asyncio.Event()
         logging.info("Server started")
 
+        # ========== ОСНОВНОЙ HANDLER (синхронный по логике) ==========
         async def handler(message):
-            async with semaphore:
-                loop = asyncio.get_running_loop()
+            try:
+                result = await active_pipeline(translator=translator, message=message.body)
+                await producer.produce(result)
+                await message.ack()
+                logging.debug(f"Successfully processed message")
+                return result
 
-                try:
-                    func = partial(active_pipeline, translator, message.body)
+            except pipeline.EmptyPayloadError as e0:
+                logging.warning(f"Empty payload, discarding: {e0}")
+                await message.nack(requeue=False)
+                return None
 
-                    result = await loop.run_in_executor(
-                        executor,
-                        func
-                    )
+            except nmt.TranslationEmptyError as e1:
+                logging.error(f"Empty response, sending original: {e1}")
+                await producer.produce(message.body)
+                await message.ack()
+                return message.body.decode()
 
-                    # all good do ack
-                    await producer.produce(result)
+            except Exception as e2:
+                logging.exception(f"Unexpected error, requeue: {e2}")
+                await message.nack(requeue=True)
+                raise
 
-                except pipeline.EmptyPayloadError as e0:
-                    logging.warning(f"Empty payload: {e0}")
-                    # do ack to kill bad message
-                    raise ValueError(f"Empty payload: {e0}")
-                except nmt.TranslationEmptyError as e1:
-                    logging.error(f"Translation empty: {e1}")
-                    # do ack because it is our error
-                    raise
-                except Exception as e2:
-                    logging.exception(f"Unexpected error: {e2}")
-                    # do nack cause its unexpected our error
-                    raise
+        # ========== FIRE-AND-FORGET ОБЁРТКА ==========
+        async def background_handler(message):
+            """Запускает handler в фоне, не дожидаясь результата."""
+            loop = asyncio.get_running_loop()
+            loop.create_task(handler(message))
 
         async def main():
-            await consumer.start_consuming(handler=handler)
+            # Передаём background_handler вместо handler
+            await consumer.start_consuming(handler=background_handler)
+            await shutdown_event.wait()
 
-        asyncio.run(main())
-        executor.shutdown(wait=True)
+        # Запускаем с обработкой graceful shutdown
+        try:
+            await main()
+        except KeyboardInterrupt:
+            logging.info("Received shutdown signal")
+            shutdown_event.set()
+        finally:
+            logging.info("Graceful shutdown complete")
 
-    except KeyboardInterrupt:
-        logging.info("Shutting down")
-        return
     except Exception as e:
         logging.exception(f"Critical error: {e}")
-        return
+        raise
 
 
 if __name__ == '__main__':
-    serve()
+    if sys.platform != "win32":
+        import uvloop
+
+        uvloop.install()
+
+    asyncio.run(serve())
