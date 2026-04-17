@@ -15,11 +15,9 @@ services:
       "--gpu-memory-utilization", "${VLLM_GPU_MEMORY_UTILIZATION}",
       "--hf-token", "${HF_TOKEN}",
       "--kv-cache-dtype","${KV_CACHE_DTYPE}",
-      "--swap-space","${VLLM_RAM_SWAP_SPACE}",
       "--max-num-batched-tokens","${VLLM_MAX_BATCHED_TOKENS}",
       "--trust-remote-code",
-      "--enable-prefix-caching",
-      "--log-level debug",
+      "--enable-prefix-caching"
     ]
     restart: unless-stopped
     deploy:
@@ -91,19 +89,19 @@ services:
               count: all
               capabilities: [ gpu ]
 
-    llm_translator:
-      build:
-        context: services/llm_translator
-        dockerfile: Dockerfile.llm_translator
-      container_name: llm_translator
-      env_file:
-        - .env
-      restart: unless-stopped
-      depends_on:
-        rabbitmq:
-          condition: service_healthy
-        vllm:
-          condition: service_healthy
+  llm_translator:
+    build:
+      context: services/llm_translator
+      dockerfile: Dockerfile.llm_translator
+    container_name: llm_translator
+    env_file:
+      - .env
+    restart: unless-stopped
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      vllm:
+        condition: service_healthy
 
 networks:
   fluence-net:
