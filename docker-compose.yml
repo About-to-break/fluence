@@ -91,6 +91,8 @@ services:
     container_name: nmt_translator
     env_file:
       - .env
+    ports:
+      - "9090:9090"
     restart: unless-stopped
     depends_on:
       rabbitmq:
@@ -110,6 +112,8 @@ services:
       container_name: llm_translator
       env_file:
         - .env
+      ports:
+        - "9091:9090"
       restart: unless-stopped
       depends_on:
         rabbitmq:
