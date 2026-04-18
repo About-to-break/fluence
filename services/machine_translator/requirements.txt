@@ -6,7 +6,7 @@ huggingface_hub
 python-dotenv
 transformers
 sentencepiece
-accelerate
+orjson
 
 git+https://github.com/Manga-ai-project/toolbox-logging.git
 git+https://github.com/Manga-ai-project/toolbox-rabbitmq.git

@@ -1,6 +1,7 @@
 python-dotenv
 openai
 uvloop
+orjson
 
 git+https://github.com/Manga-ai-project/toolbox-logging.git
 git+https://github.com/Manga-ai-project/toolbox-rabbitmq.git

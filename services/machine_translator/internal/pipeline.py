@@ -1,7 +1,6 @@
-import json
 import logging
 from types import SimpleNamespace
-## починить
+import orjson
 from .nmt.nmt import *
 from .nmt.ct2nmt import *
 
@@ -9,7 +8,7 @@ from .nmt.ct2nmt import *
 class EmptyPayloadError(Exception):
     pass
 def run_pipeline(translator: MachineTranslator, message: bytes):
-    parsed_body = json.loads(message.decode("utf-8"))
+    parsed_body = orjson.loads(message.decode("utf-8"))
     text = parsed_body["text"]
     uuid = parsed_body["uuid"]
 
@@ -26,7 +25,7 @@ def run_pipeline(translator: MachineTranslator, message: bytes):
 
     logging.info(f"Translated text: {translation}")
 
-    new_message = json.dumps({"uuid": uuid, "text": translation}).encode("utf-8")
+    new_message = orjson.dumps({"uuid": uuid, "text": translation}).encode("utf-8")
 
     return new_message
 
@@ -40,7 +39,7 @@ async def run_batch_pipeline(translator: CT2Translator, message: bytes):
     Новый пайплайн — асинхронный батчинг.
     translator здесь используется только для получения batcher'а.
     """
-    parsed_body = json.loads(message.decode("utf-8"))
+    parsed_body = orjson.loads(message.decode("utf-8"))
     text = parsed_body["text"]
     uuid = parsed_body["uuid"]
 
@@ -53,7 +52,7 @@ async def run_batch_pipeline(translator: CT2Translator, message: bytes):
     if translation == "":
         raise TranslationEmptyError(f"Empty translation for {text}")
 
-    return json.dumps({"uuid": uuid, "text": translation}, ensure_ascii=False).encode("utf-8")
+    return orjson.dumps({"uuid": uuid, "text": translation}, ensure_ascii=False).encode("utf-8")
 
 
 
