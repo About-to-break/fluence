@@ -74,7 +74,7 @@ def serve():
 
         logging.info("Server started")
 
-        async def handler(message):
+        async def handler(message, **kwargs):
             async with semaphore:
                 loop = asyncio.get_running_loop()
 

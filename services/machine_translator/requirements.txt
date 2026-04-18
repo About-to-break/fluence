@@ -10,3 +10,4 @@ orjson
 
 git+https://github.com/Manga-ai-project/toolbox-logging.git
 git+https://github.com/Manga-ai-project/toolbox-rabbitmq.git
+git+https://github.com/About-to-break/telephon.git

@@ -51,7 +51,7 @@ async def serve():
         logging.info("Server started")
 
         # ========== ОСНОВНОЙ HANDLER ==========
-        async def handler(message):
+        async def handler(message, wait_timer):
             async with handler_semaphore:
                 try:
                     result = await active_pipeline(
@@ -93,9 +93,9 @@ async def serve():
                     raise
 
         # ========== FIRE-AND-FORGET ОБЁРТКА ==========
-        async def background_handler(message):
+        async def background_handler(message, wait_timer):
             """Запускает handler в фоне, не дожидаясь результата."""
-            asyncio.create_task(handler(message))
+            asyncio.create_task(handler(message, wait_timer))
 
         async def main():
             await consumer.start_consuming(handler=background_handler)

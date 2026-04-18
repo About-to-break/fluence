@@ -112,7 +112,7 @@ def create_app(
     async def lifespan(app: FastAPI):
         consumer_task = None
 
-        async def handle_output_message(message):
+        async def handle_output_message(message, **kwargs):
             try:
                 payload = orjson.loads(message.body.decode("utf-8"))
             except (AttributeError, UnicodeDecodeError, orjson.JSONDecodeError):

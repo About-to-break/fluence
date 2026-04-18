@@ -3,6 +3,7 @@ import logging
 import asyncio
 import concurrent.futures
 from logging_tools import configure_global_logging
+import telephon
 from config import load_config
 from internal.misc import queue
 from internal.nmt import nmt, ct2nmt
@@ -53,7 +54,12 @@ async def serve():
             logging.info(f"Set to translate {config.CT2NMT_SRC_LANG} to {config.CT2NMT_TGT_LANG}")
         else:
             raise ValueError("Pipeline type not supported")
-
+        '''
+        metrics_server = telemetry.init_metrics(service_name="nmt service",
+                                                max_concurrent=int(config.MAX_CONCURRENT_REQUESTS),
+                                                prefetch_count=int(config.PREFETCH_COUNT)
+                                                )
+        '''
         handler_semaphore = asyncio.Semaphore(int(config.MAX_CONCURRENT_REQUESTS))
 
         active_pipeline = pipeline.get_pipeline(config, executor=translation_executor)
@@ -61,42 +67,50 @@ async def serve():
         producer = broker["producer"]
         consumer = broker["consumer"]
 
+        #metrics_server.start(port=int(config.METRICS_PORT))
+
         await producer.connect()
 
         shutdown_event = asyncio.Event()
         logging.info("Server started")
 
         # ========== ОСНОВНОЙ HANDLER (синхронный по логике) ==========
-        async def handler(message):
+        async def handler(message, wait_timer):
             async with handler_semaphore:
+                logging.warning(f"DEBUG!!!!!!! {wait_timer}")
+                #metrics_server.record_request_start()
                 try:
                     result = await active_pipeline(translator=translator, message=message.body)
                     await producer.produce(result)
                     await message.ack()
                     logging.debug(f"Successfully processed message")
+                    #metrics_server.record_request_end(success=True)
                     return result
 
                 except pipeline.EmptyPayloadError as e0:
                     logging.warning(f"Empty payload, discarding: {e0}")
+                    #metrics_server.record_request_end(success=False)
                     await message.nack(requeue=False)
                     return None
 
                 except nmt.TranslationEmptyError as e1:
                     logging.error(f"Empty response, sending original: {e1}")
+                    #metrics_server.record_request_end(success=False)
                     await producer.produce(message.body)
                     await message.ack()
                     return message.body.decode()
 
                 except Exception as e2:
                     logging.exception(f"Unexpected error, requeue: {e2}")
+                    #metrics_server.record_request_end(success=False)
                     await message.nack(requeue=True)
                     raise
 
         # ========== FIRE-AND-FORGET ОБЁРТКА ==========
-        async def background_handler(message):
+        async def background_handler(message, wait_timer):
             """Запускает handler в фоне, не дожидаясь результата."""
             loop = asyncio.get_running_loop()
-            loop.create_task(handler(message))
+            loop.create_task(handler(message, wait_timer))
 
         async def main():
             # Передаём background_handler вместо handler
@@ -110,8 +124,10 @@ async def serve():
             logging.info("Received shutdown signal")
             shutdown_event.set()
         finally:
+            #metrics_server.stop()
             translation_executor.shutdown(wait=True)
             logging.info("Graceful shutdown complete")
+
 
     except Exception as e:
         logging.exception(f"Critical error: {e}")
