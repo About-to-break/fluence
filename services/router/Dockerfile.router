@@ -3,20 +3,55 @@ FROM python:3.11-slim
 # Если мы будем использовать свою нейросеть, то образ надо сменить и сделать поддержку cuda
 
 ENV PYTHONUNBUFFERED=1
+ENV NLTK_DATA=/app/nltk_data
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     git \
     libgl1 \
     libglib2.0-0 \
+    libomp-dev \
+    curl \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY requirements.txt .
 
+# Копируем и устанавливаем зависимости
+COPY requirements.txt .
 RUN pip install --upgrade pip \
  && pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Скачиваем NLTK данные НАПРЯМУЮ с GitHub (без import nltk)
+RUN mkdir -p /app/nltk_data/tokenizers && \
+    curl -L https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/tokenizers/punkt.zip -o /tmp/punkt.zip && \
+    unzip -q /tmp/punkt.zip -d /app/nltk_data/tokenizers/ && \
+    rm /tmp/punkt.zip
+
+RUN mkdir -p /app/nltk_data/corpora && \
+    curl -L https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/stopwords.zip -o /tmp/stopwords.zip && \
+    unzip -q /tmp/stopwords.zip -d /app/nltk_data/corpora/ && \
+    rm /tmp/stopwords.zip
+
+RUN curl -L https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/words.zip -o /tmp/words.zip && \
+    unzip -q /tmp/words.zip -d /app/nltk_data/corpora/ && \
+    rm /tmp/words.zip
+
+RUN curl -L https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/wordnet.zip -o /tmp/wordnet.zip && \
+    unzip -q /tmp/wordnet.zip -d /app/nltk_data/corpora/ && \
+    rm /tmp/wordnet.zip
+
+# punkt_tab
+RUN curl -L https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/tokenizers/punkt_tab.zip -o /tmp/punkt_tab.zip && \
+    unzip -q /tmp/punkt_tab.zip -d /app/nltk_data/tokenizers/ && \
+    rm /tmp/punkt_tab.zip
+
+# Копируем код
+COPY config.py .
+COPY service.py .
+COPY internal/ ./internal/
+
+# Порт для метрик (если добавим Prometheus)
+EXPOSE 8000
 
 CMD ["python", "service.py"]
