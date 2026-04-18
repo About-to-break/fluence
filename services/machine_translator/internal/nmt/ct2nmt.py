@@ -139,11 +139,12 @@ class Batcher:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, translator: CT2Translator, max_wait: float = 0.05):
+    def __init__(self, translator: CT2Translator, max_wait: float = 0.05, executor=None):
         # Предотвращаем повторную инициализацию синглтона
         if hasattr(self, '_initialized'):
             return
 
+        self.executor = executor
         self.translator = translator
         self.max_wait = max_wait
         self.queue: List[str] = []
@@ -158,7 +159,8 @@ class Batcher:
         self.instance_id = id(self)
         self._initialized = True
 
-        logger.info(f"Batcher initialized: max_wait={max_wait * 1000:.0f}ms, id={self.instance_id}")
+        logger.info(f"Batcher initialized: max_wait={max_wait * 1000:.0f}ms, id={self.instance_id}\n "
+                    f"executor={'custom' if executor else 'default'}\n id={self.instance_id}")
 
     async def translate(self, text: str) -> str:
         loop = asyncio.get_running_loop()
@@ -212,7 +214,7 @@ class Batcher:
 
             loop = asyncio.get_running_loop()
             results, _ = await loop.run_in_executor(
-                None, self.translator.translate_batch, texts
+                self.executor, self.translator.translate_batch, texts
             )
 
             for future, result in zip(futures, results):
@@ -233,14 +235,13 @@ class Batcher:
                 logger.debug(f"✅ Batch processor finished, queue empty (batcher id: {self.instance_id})")
 
 
-
 # Глобальный синглтон батчера
 _batcher: Optional[Batcher] = None
 
 
-def get_batcher(translator: CT2Translator) -> Batcher:
+def get_batcher(translator: CT2Translator, executor=None) -> Batcher:
     global _batcher
     if _batcher is None:
         logger.info("Creating global batcher instance")
-        _batcher = Batcher(translator)
+        _batcher = Batcher(translator, executor=executor)
     return _batcher

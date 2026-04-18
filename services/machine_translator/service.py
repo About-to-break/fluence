@@ -1,12 +1,14 @@
 import sys
 import logging
 import asyncio
+import concurrent.futures
 from logging_tools import configure_global_logging
 from config import load_config
 from internal.misc import queue
 from internal.nmt import nmt, ct2nmt
 from internal import pipeline
 
+translation_executor = None
 
 async def serve():
     try:
@@ -15,6 +17,11 @@ async def serve():
         configure_global_logging(
             level=config.LOG_LEVEL,
             file=config.LOG_FILE
+        )
+
+        translation_executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=int(config.TRANSLATION_WORKERS),
+            thread_name_prefix="translator"
         )
 
         logging.debug(config)
@@ -47,7 +54,7 @@ async def serve():
         else:
             raise ValueError("Pipeline type not supported")
 
-        active_pipeline = pipeline.get_pipeline(config)
+        active_pipeline = pipeline.get_pipeline(config, executor=translation_executor)
         broker = queue.get_broker(config)
         producer = broker["producer"]
         consumer = broker["consumer"]
@@ -100,6 +107,7 @@ async def serve():
             logging.info("Received shutdown signal")
             shutdown_event.set()
         finally:
+            translation_executor.shutdown(wait=True)
             logging.info("Graceful shutdown complete")
 
     except Exception as e:
