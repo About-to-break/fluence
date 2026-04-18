@@ -95,7 +95,7 @@ class CT2Translator:
         if not texts:
             return [], 0.0
 
-        logger.info(f"🔄 Translating batch of {len(texts)} texts...")
+        logger.debug(f"🔄 Translating batch of {len(texts)} texts...")
         start_total = time.time()
 
         source_batch = [
@@ -123,7 +123,7 @@ class CT2Translator:
         elapsed = time.time() - start_total
         throughput = len(texts) / elapsed if elapsed > 0 else 0
 
-        logger.info(
+        logger.debug(
             f"✅ Batch completed: {len(texts)} texts in {elapsed:.3f}s "
             f"({throughput:.1f} texts/sec, {elapsed / len(texts) * 1000:.1f} ms/text)"
         )
@@ -169,17 +169,17 @@ class Batcher:
             self.queue.append(text)
             self.futures.append(future)
 
-            logger.info(
+            logger.debug(
                 f"📥 Text added to queue. Queue size: {len(self.queue)}, task exists: {self.task is not None}, batcher id: {self.instance_id}")
 
             if queue_was_empty:
-                logger.info(f"📥 First text in batch, starting timer... (batcher id: {self.instance_id})")
+                logger.debug(f"📥 First text in batch, starting timer... (batcher id: {self.instance_id})")
 
             if self.task is None:
                 self.task = asyncio.create_task(self._process())
-                logger.info(f"🚌 Batch processor started (batcher id: {self.instance_id})")
+                logger.debug(f"🚌 Batch processor started (batcher id: {self.instance_id})")
             else:
-                logger.info(f"⏳ Batch processor already running, waiting... (batcher id: {self.instance_id})")
+                logger.debug(f"⏳ Batch processor already running, waiting... (batcher id: {self.instance_id})")
 
         return await future
 
@@ -198,14 +198,14 @@ class Batcher:
             self.futures.clear()
             # НЕ сбрасываем self.task здесь!
 
-            logger.info(f"🔍 _process: collected {batch_size} texts from queue (batcher id: {self.instance_id})")
+            logger.debug(f"🔍 _process: collected {batch_size} texts from queue (batcher id: {self.instance_id})")
 
         if texts:
             self.total_batches += 1
             self.total_texts += batch_size
             self.total_wait_time += wait_time
 
-            logger.info(
+            logger.debug(
                 f"🚌 Batch #{self.total_batches}: {batch_size} texts collected "
                 f"(waited {wait_time * 1000:.1f}ms, batcher id: {self.instance_id})"
             )
@@ -218,19 +218,19 @@ class Batcher:
             for future, result in zip(futures, results):
                 future.set_result(result)
         else:
-            logger.info(f"⏳ _process timed out with empty queue (batcher id: {self.instance_id})")
+            logger.debug(f"⏳ _process timed out with empty queue (batcher id: {self.instance_id})")
 
         # ТОЛЬКО ПОСЛЕ ЗАВЕРШЕНИЯ ПЕРЕВОДА проверяем очередь и сбрасываем task
         async with self.lock:
             if self.queue:
                 # За время перевода накопились новые тексты — запускаем новый батч
-                logger.info(
+                logger.debug(
                     f"🔄 {len(self.queue)} texts arrived during translation, starting new batch (batcher id: {self.instance_id})")
                 self.task = asyncio.create_task(self._process())
             else:
                 # Очередь пуста — сбрасываем task
                 self.task = None
-                logger.info(f"✅ Batch processor finished, queue empty (batcher id: {self.instance_id})")
+                logger.debug(f"✅ Batch processor finished, queue empty (batcher id: {self.instance_id})")
 
 
 
