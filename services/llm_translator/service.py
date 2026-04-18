@@ -38,6 +38,8 @@ async def serve():
         else:
             raise ValueError("Unsupported pipeline type")
 
+        handler_semaphore = asyncio.Semaphore(int(config.MAX_CONCURRENT_REQUESTS))
+
         active_pipeline = pipeline.get_pipeline(config)
         broker = queue.get_broker(config)
         producer = broker["producer"]
@@ -50,44 +52,45 @@ async def serve():
 
         # ========== ОСНОВНОЙ HANDLER ==========
         async def handler(message):
-            try:
-                result = await active_pipeline(
-                    vllm_connector,
-                    config.OPENAI_API_MAX_TOKENS,
-                    message.body
-                )
+            async with handler_semaphore:
+                try:
+                    result = await active_pipeline(
+                        vllm_connector,
+                        config.OPENAI_API_MAX_TOKENS,
+                        message.body
+                    )
 
-                await producer.produce(result)
-                await message.ack()
-                logging.debug(f"Successfully processed message")
-                return result
+                    await producer.produce(result)
+                    await message.ack()
+                    logging.debug(f"Successfully processed message")
+                    return result
 
-            except pipeline.EmptyPayloadError as e0:
-                logging.warning(f"Empty payload, discarding: {e0}")
-                await message.nack(requeue=False)
-                return None
+                except pipeline.EmptyPayloadError as e0:
+                    logging.warning(f"Empty payload, discarding: {e0}")
+                    await message.nack(requeue=False)
+                    return None
 
-            except pipeline.EmptyResponseError as e1:
-                logging.error(f"Empty response, sending original: {e1}")
-                await producer.produce(message.body)
-                await message.ack()
-                return message.body.decode()
+                except pipeline.EmptyResponseError as e1:
+                    logging.error(f"Empty response, sending original: {e1}")
+                    await producer.produce(message.body)
+                    await message.ack()
+                    return message.body.decode()
 
-            except VLLMTimeoutError as te:
-                logging.warning(f"vLLM timeout, fallback to original: {te}")
-                await producer.produce(message.body)
-                await message.ack()
-                return message.body.decode()
+                except VLLMTimeoutError as te:
+                    logging.warning(f"vLLM timeout, fallback to original: {te}")
+                    await producer.produce(message.body)
+                    await message.ack()
+                    return message.body.decode()
 
-            except VLLMConnectionError as ce:
-                logging.error(f"vLLM connection error, requeue: {ce}")
-                await message.nack(requeue=True)
-                raise
+                except VLLMConnectionError as ce:
+                    logging.error(f"vLLM connection error, requeue: {ce}")
+                    await message.nack(requeue=True)
+                    raise
 
-            except Exception as e2:
-                logging.exception(f"Unexpected error, requeue: {e2}")
-                await message.nack(requeue=True)
-                raise
+                except Exception as e2:
+                    logging.exception(f"Unexpected error, requeue: {e2}")
+                    await message.nack(requeue=True)
+                    raise
 
         # ========== FIRE-AND-FORGET ОБЁРТКА ==========
         async def background_handler(message):

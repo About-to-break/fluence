@@ -54,6 +54,8 @@ async def serve():
         else:
             raise ValueError("Pipeline type not supported")
 
+        handler_semaphore = asyncio.Semaphore(int(config.MAX_CONCURRENT_REQUESTS))
+
         active_pipeline = pipeline.get_pipeline(config, executor=translation_executor)
         broker = queue.get_broker(config)
         producer = broker["producer"]
@@ -66,28 +68,29 @@ async def serve():
 
         # ========== ОСНОВНОЙ HANDLER (синхронный по логике) ==========
         async def handler(message):
-            try:
-                result = await active_pipeline(translator=translator, message=message.body)
-                await producer.produce(result)
-                await message.ack()
-                logging.debug(f"Successfully processed message")
-                return result
+            async with handler_semaphore:
+                try:
+                    result = await active_pipeline(translator=translator, message=message.body)
+                    await producer.produce(result)
+                    await message.ack()
+                    logging.debug(f"Successfully processed message")
+                    return result
 
-            except pipeline.EmptyPayloadError as e0:
-                logging.warning(f"Empty payload, discarding: {e0}")
-                await message.nack(requeue=False)
-                return None
+                except pipeline.EmptyPayloadError as e0:
+                    logging.warning(f"Empty payload, discarding: {e0}")
+                    await message.nack(requeue=False)
+                    return None
 
-            except nmt.TranslationEmptyError as e1:
-                logging.error(f"Empty response, sending original: {e1}")
-                await producer.produce(message.body)
-                await message.ack()
-                return message.body.decode()
+                except nmt.TranslationEmptyError as e1:
+                    logging.error(f"Empty response, sending original: {e1}")
+                    await producer.produce(message.body)
+                    await message.ack()
+                    return message.body.decode()
 
-            except Exception as e2:
-                logging.exception(f"Unexpected error, requeue: {e2}")
-                await message.nack(requeue=True)
-                raise
+                except Exception as e2:
+                    logging.exception(f"Unexpected error, requeue: {e2}")
+                    await message.nack(requeue=True)
+                    raise
 
         # ========== FIRE-AND-FORGET ОБЁРТКА ==========
         async def background_handler(message):

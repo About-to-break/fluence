@@ -30,7 +30,7 @@ async def run_pipeline(connector: VLLMConnector, max_tokens: int, message: bytes
 
         logging.info(f"Translated text: {translation}")
 
-        new_message = orjson.dumps({"uuid": uuid, "text": translation}).encode("utf-8")
+        new_message = orjson.dumps({"uuid": uuid, "text": translation})
 
         return new_message
 
