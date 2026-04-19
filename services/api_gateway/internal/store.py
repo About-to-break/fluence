@@ -1,3 +1,4 @@
+from dataclasses import replace
 from threading import Lock
 
 from .models import JobRecord, JobStatus
@@ -11,11 +12,14 @@ class InMemoryJobStore:
     def create(self, job: JobRecord) -> JobRecord:
         with self._lock:
             self._jobs[job.uuid] = job
-            return self._jobs[job.uuid]
+            return replace(self._jobs[job.uuid])
 
     def get(self, job_uuid: str) -> JobRecord | None:
         with self._lock:
-            return self._jobs.get(job_uuid)
+            job = self._jobs.get(job_uuid)
+            if job is None:
+                return None
+            return replace(job)
 
     def set_status(
         self,
@@ -27,7 +31,7 @@ class InMemoryJobStore:
             job = self._jobs[job_uuid]
             job.status = status
             job.error_detail = error_detail
-            return job
+            return replace(job)
 
     def set_result(
         self,
@@ -44,4 +48,4 @@ class InMemoryJobStore:
                 job.lamport_ts = lamport_ts
             job.translated_text = translated_text
             job.error_detail = error_detail
-            return job
+            return replace(job)
