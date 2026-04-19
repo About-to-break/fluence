@@ -50,7 +50,7 @@ make init-env
 Start the service with:
 
 ```bash
-make start
+make run
 ```
 
 ---

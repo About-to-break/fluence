@@ -1,5 +1,5 @@
 import asyncio
-import json
+import orjson
 import logging
 from contextlib import asynccontextmanager, suppress
 from types import SimpleNamespace
@@ -112,10 +112,10 @@ def create_app(
     async def lifespan(app: FastAPI):
         consumer_task = None
 
-        async def handle_output_message(message):
+        async def handle_output_message(message, **kwargs):
             try:
-                payload = json.loads(message.body.decode("utf-8"))
-            except (AttributeError, UnicodeDecodeError, json.JSONDecodeError):
+                payload = orjson.loads(message.body.decode("utf-8"))
+            except (AttributeError, UnicodeDecodeError, orjson.JSONDecodeError):
                 logging.warning("Skipping malformed q.out_gateway payload")
                 return
 

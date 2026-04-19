@@ -1,0 +1,29 @@
+# Модели и данные
+internal/routing_core/models/
+internal/routing_core/data/
+*.bin
+*.joblib
+*.csv
+
+# Кэш HuggingFace
+hf_cache/
+
+# Виртуальное окружение
+.venv/
+venv/
+
+# Тесты
+tests/
+*.log
+
+# Архивы
+*.tar.gz
+*.zip
+release_*/
+
+# IDE
+.idea/
+.vscode/
+
+# Git
+.git/

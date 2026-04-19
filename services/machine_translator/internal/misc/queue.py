@@ -44,7 +44,10 @@ class KafkaMessage(IncomingMessage):
 
 class MessageProducer(ABC):
     @abstractmethod
-    async def produce(self, message):
+    async def produce(self, message, key=None):
+        pass
+
+    async def connect(self):
         pass
 
 
@@ -53,17 +56,26 @@ class MessageConsumer(ABC):
     async def start_consuming(self, handler: Callable):
         pass
 
+    async def connect(self):
+        pass
+
 class KafkaProducer(MessageProducer):
     def __init__(self, config: SimpleNamespace):
         # init aiokafka producer here
         pass
 
-    async def produce(self, message):
+    async def produce(self, message, key=None):
+        pass
+
+    async def connect(self):
         pass
 
 
 class KafkaConsumer(MessageConsumer):
     def __init__(self, config: SimpleNamespace):
+        pass
+
+    async def connect(self):
         pass
 
     async def start_consuming(self, handler: Callable):
@@ -77,20 +89,26 @@ class RabbitProducer(MessageProducer):
             retries=config.RABBITMQ_RETRIES,
         )
 
-    async def produce(self, message):
-        await self._producer.produce(message)
+    async def produce(self, message, key=None):
+        await self._producer.produce(body=message, routing_key=key)
+
+    async def connect(self):
+        await self._producer.connect()
 
 
 class RabbitConsumer(MessageConsumer):
     def __init__(self, config: SimpleNamespace):
         self._consumer = async_rabbitmq.RabbitConsumerAIO(
             uri=config.RABBITMQ_URI,
-            prefetch_count=1,
+            prefetch_count=int(config.PREFETCH_COUNT),
             queue=config.RABBITMQ_QUEUE,
         )
 
     async def start_consuming(self, handler: Callable):
         await self._consumer.consume(handler)
+
+    async def connect(self):
+        await self._consumer.connect()
 
 def get_broker(config: SimpleNamespace):
     if config.MESSAGE_BROKER == "rabbitmq":

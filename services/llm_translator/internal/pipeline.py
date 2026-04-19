@@ -1,4 +1,4 @@
-import json
+import orjson
 import logging
 from types import SimpleNamespace
 from .vllm.connector import *
@@ -12,7 +12,7 @@ class EmptyResponseError(Exception):
 
 
 async def run_pipeline(connector: VLLMConnector, max_tokens: int, message: bytes):
-    parsed_body = json.loads(message.decode("utf-8"))
+    parsed_body = orjson.loads(message.decode("utf-8"))
     text = parsed_body["text"]
     uuid = parsed_body["uuid"]
 
@@ -30,7 +30,7 @@ async def run_pipeline(connector: VLLMConnector, max_tokens: int, message: bytes
 
         logging.info(f"Translated text: {translation}")
 
-        new_message = json.dumps({"uuid": uuid, "text": translation}).encode("utf-8")
+        new_message = orjson.dumps({"uuid": uuid, "text": translation})
 
         return new_message
 

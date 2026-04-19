@@ -1,4 +1,13 @@
 python-dotenv
+orjson
 
 git+https://github.com/Manga-ai-project/toolbox-logging.git
 git+https://github.com/Manga-ai-project/toolbox-rabbitmq.git
+
+numpy==1.26.0
+scikit-learn==1.5.0
+xgboost==2.1.0
+joblib==1.4.0
+nltk==3.9.0
+huggingface_hub==0.20.0
+kenlm @ https://github.com/kpu/kenlm/archive/master.zip
