@@ -46,10 +46,15 @@ RUN curl -L https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/t
     unzip -q /tmp/punkt_tab.zip -d /app/nltk_data/tokenizers/ && \
     rm /tmp/punkt_tab.zip
 
+COPY scripts/download_models.py /app/scripts/
+
+RUN python /app/scripts/download_models.py
+
 # Копируем код
 COPY config.py .
 COPY service.py .
 COPY internal/ ./internal/
+
 
 # Порт для метрик (если добавим Prometheus)
 EXPOSE 8000
