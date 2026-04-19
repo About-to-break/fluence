@@ -1,7 +1,10 @@
 import logging
 import asyncio
+import time
+import sys
 from logging_tools import configure_global_logging
 from config import load_config, get_prompt
+from telephon import telemetry
 from internal.misc import queue
 from internal.vllm.connector import *
 from internal import pipeline
@@ -37,62 +40,91 @@ async def serve():
         else:
             raise ValueError("Unsupported pipeline type")
 
+        metrics_server = telemetry.init_metrics(service_name="llm service",
+                                                max_concurrent=int(config.MAX_CONCURRENT_REQUESTS),
+                                                prefetch_count=int(config.PREFETCH_COUNT)
+                                                )
+
+        handler_semaphore = asyncio.Semaphore(int(config.MAX_CONCURRENT_REQUESTS))
+
         active_pipeline = pipeline.get_pipeline(config)
         broker = queue.get_broker(config)
         producer = broker["producer"]
         consumer = broker["consumer"]
 
+        metrics_server.start(port=int(config.METRICS_PORT))
+
         await producer.connect()
 
-        # Семафор для graceful shutdown, а не для ограничения конкурентности
         shutdown_event = asyncio.Event()
+        logging.info("Server started")
 
-        async def handler(message):
-            """Асинхронный обработчик — конкурентность управляется семафором в VLLMConnector"""
-            try:
-                result = await active_pipeline(
-                    vllm_connector,
-                    config.OPENAI_API_MAX_TOKENS,
-                    message.body
-                )
+        # ========== ОСНОВНОЙ HANDLER ==========
+        async def handler(message, t_arr):
+            async with handler_semaphore:
+                t_hand = time.monotonic()
+                metrics_server.record_request_start()
+                try:
+                    result = await active_pipeline(
+                        vllm_connector,
+                        config.OPENAI_API_MAX_TOKENS,
+                        message.body
+                    )
 
-                await producer.produce(result)
-                logging.debug(f"Successfully processed message")
+                    await producer.produce(result)
+                    await message.ack()
+                    logging.debug(f"Successfully processed message")
+                    metrics_server.record_request_end(success=True, wait_time=t_hand - t_arr, service_time=time.monotonic() - t_hand)
+                    return result
 
-            except pipeline.EmptyPayloadError as e0:
-                logging.warning(f"Empty payload, discarding: {e0}")
-                # Ack — плохое сообщение удаляем из очереди
+                except pipeline.EmptyPayloadError as e0:
+                    logging.warning(f"Empty payload, discarding: {e0}")
+                    metrics_server.record_request_end(success=True, wait_time=t_hand - t_arr, service_time=time.monotonic() - t_hand)
+                    await message.nack(requeue=False)
+                    return None
 
-            except pipeline.EmptyResponseError as e1:
-                logging.error(f"Empty response, sending original: {e1}")
-                # Отправляем оригинальное сообщение как fallback
-                await producer.produce(message.body)
+                except pipeline.EmptyResponseError as e1:
+                    logging.error(f"Empty response, sending original: {e1}")
+                    metrics_server.record_request_end(success=False, wait_time=t_hand - t_arr, service_time=time.monotonic() - t_hand)
+                    await producer.produce(message.body)
+                    await message.ack()
+                    return message.body.decode()
 
-            except VLLMTimeoutError as te:
-                logging.warning(f"vLLM timeout, fallback to original: {te}")
-                # Отправляем то, что было до вызова LLM (оригинал из очереди)
-                await producer.produce(message.body)
+                except VLLMTimeoutError as te:
+                    logging.warning(f"vLLM timeout, fallback to original: {te}")
+                    metrics_server.record_request_end(success=True, wait_time=t_hand - t_arr, service_time=time.monotonic() - t_hand)
+                    await producer.produce(message.body)
+                    await message.ack()
+                    return message.body.decode()
 
-            except Exception as e2:
-                logging.exception(f"Unexpected error, requeue: {e2}")
-                # Nack с requeue — пусть другая реплика попробует
-                raise  # Пробрасываем для nack в consumer'е
+                except VLLMConnectionError as ce:
+                    logging.error(f"vLLM connection error, requeue: {ce}")
+                    metrics_server.record_request_end(success=False, wait_time=t_hand - t_arr, service_time=time.monotonic() - t_hand)
+                    await message.nack(requeue=True)
+                    raise
+
+                except Exception as e2:
+                    metrics_server.record_request_end(success=False, wait_time=t_hand - t_arr, service_time=time.monotonic() - t_hand)
+                    logging.exception(f"Unexpected error, requeue: {e2}")
+                    await message.nack(requeue=True)
+                    raise
+
+        # ========== FIRE-AND-FORGET ОБЁРТКА ==========
+        async def background_handler(message, t_arr):
+            """Запускает handler в фоне, не дожидаясь результата."""
+            asyncio.create_task(handler(message, t_arr))
 
         async def main():
-            await consumer.start_consuming(handler=handler)
-
-            # Ждем сигнала завершения
+            await consumer.start_consuming(handler=background_handler)
             await shutdown_event.wait()
 
-        # Запускаем с обработкой graceful shutdown
         try:
             await main()
         except KeyboardInterrupt:
             logging.info("Received shutdown signal")
             shutdown_event.set()
         finally:
-            # await consumer.close()
-            # await producer.close()
+            metrics_server.stop()
             logging.info("Graceful shutdown complete")
 
     except Exception as e:
@@ -101,4 +133,9 @@ async def serve():
 
 
 if __name__ == '__main__':
+    if sys.platform != "win32":
+        import uvloop
+
+        uvloop.install()
+
     asyncio.run(serve())

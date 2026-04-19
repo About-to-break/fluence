@@ -2,6 +2,8 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 import asyncio
+import os
+import nltk
 from logging_tools import configure_global_logging
 from config import load_config
 from internal.misc import queue
@@ -9,8 +11,38 @@ from internal.routing_core.router import NoneRouterDecisionException
 from internal import pipeline
 
 
+def setup_nltk():
+    """Download NLTK data if not present."""
+    nltk_data_dir = os.environ.get('NLTK_DATA', None)
+
+    resources = [
+        ('tokenizers/punkt', 'punkt'),
+        ('tokenizers/punkt_tab', 'punkt_tab'),
+        ('corpora/stopwords', 'stopwords'),
+        ('corpora/words', 'words'),
+        ('corpora/wordnet', 'wordnet'),
+    ]
+
+    for path, resource in resources:
+        try:
+            if nltk_data_dir:
+                nltk.data.find(path, paths=[nltk_data_dir])
+            else:
+                nltk.data.find(path)
+            logging.debug(f"NLTK resource '{resource}' already exists")
+        except LookupError:
+            logging.info(f"Downloading NLTK resource: {resource}")
+            if nltk_data_dir:
+                nltk.download(resource, download_dir=nltk_data_dir, quiet=True)
+            else:
+                nltk.download(resource, quiet=True)
+
+
 def serve():
     try:
+        # Сначала скачиваем NLTK данные
+        setup_nltk()
+
         config = load_config()
 
         configure_global_logging(
@@ -42,37 +74,27 @@ def serve():
 
         logging.info("Server started")
 
-        async def handler(message):
+        async def handler(message, **kwargs):
             async with semaphore:
                 loop = asyncio.get_running_loop()
 
                 try:
-                    func = partial(active_pipeline,
-                                   message.body,
-                                   fast_key_value,
-                                   quality_key_value)
+                    func = partial(active_pipeline, message.body, fast_key_value, quality_key_value)
 
-                    # Actually the same message
-                    key = await loop.run_in_executor(
-                        executor,
-                        func
-                    )
+                    key = await loop.run_in_executor(executor, func)
 
-                    # all good do ack
-                    await producer.produce(message=message, key=key)
+                    await producer.produce(message=message.body, key=key)
+                    await message.ack()
 
                 except pipeline.EmptyPayloadError as e0:
                     logging.warning(f"Empty payload: {e0}")
-                    # do ack to kill bad message
-                    raise ValueError(f"Empty payload: {e0}")
+                    await message.ack()  # Подтверждаем плохое сообщение
                 except NoneRouterDecisionException as e1:
                     logging.error(f"No routing decision was calculated: {e1}")
-                    # do ack because it is our error
-                    raise
+                    await message.ack()  # Наша ошибка, но сообщение обработано
                 except Exception as e2:
                     logging.exception(f"Unexpected error: {e2}")
-                    # do nack cause its unexpected our error
-                    raise
+                    await message.nack(requeue=True)  # Возвращаем в очередь
 
         async def main():
             await consumer.start_consuming(handler=handler)
