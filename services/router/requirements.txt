@@ -3,6 +3,7 @@ orjson
 
 git+https://github.com/Manga-ai-project/toolbox-logging.git
 git+https://github.com/Manga-ai-project/toolbox-rabbitmq.git
+git+https://github.com/About-to-break/telephon.git
 
 numpy==1.26.0
 scikit-learn==1.5.0
