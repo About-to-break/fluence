@@ -20,18 +20,24 @@ scrape_configs:
     static_configs:
       - targets: ["router:9090"]
 
+  - job_name: nmt_warm
+    scrape_interval: 3s
+    metrics_path: /metrics/warm
+    static_configs:
+      - targets: ["nmt_translator:9090"]
+
+  - job_name: nmt_stats
+    scrape_interval: 3s
+    metrics_path: /metrics/stats
+    static_configs:
+      - targets: ["nmt_translator:9090"]
+
   # Future service scrapes: enable only after metrics endpoints and ports are defined.
   # - job_name: api_gateway
   #   scrape_interval: 3s
   #   metrics_path: /metrics
   #   static_configs:
   #     - targets: ["api_gateway:<port>"]
-
-  # - job_name: nmt_translator
-  #   scrape_interval: 3s
-  #   metrics_path: /metrics
-  #   static_configs:
-  #     - targets: ["nmt_translator:<port>"]
 
   # - job_name: llm_services
   #   scrape_interval: 3s
