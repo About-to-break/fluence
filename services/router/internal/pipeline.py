@@ -9,6 +9,7 @@ import os
 from types import SimpleNamespace
 
 from . import decision_metrics
+from .prometheus_queue_depth import PrometheusQueueDepthClient
 
 # Импорты из routing_core
 from .routing_core.features import FeatureExtractor
@@ -18,6 +19,7 @@ from .routing_core.router import get_router, HysteresisRouter
 _extractor: FeatureExtractor = None
 _router: HysteresisRouter = None
 _queue_depth: int = 0
+_prometheus_queue_depth_client: PrometheusQueueDepthClient | None = None
 
 
 class EmptyPayloadError(Exception):
@@ -32,7 +34,7 @@ class NoneRouterDecisionException(Exception):
 
 def _initialize(config: SimpleNamespace = None):
     """Initialize feature extractor and router (called once)."""
-    global _extractor, _router, _queue_depth
+    global _extractor, _router, _queue_depth, _prometheus_queue_depth_client
 
     if _extractor is None:
         # Пути к моделям
@@ -47,6 +49,8 @@ def _initialize(config: SimpleNamespace = None):
         # Установить начальную глубину очереди из конфига
         if config and hasattr(config, 'QUEUE_DEPTH_STATIC'):
             _queue_depth = int(config.QUEUE_DEPTH_STATIC)
+        if config and getattr(config, "PROMETHEUS_ENABLED", False):
+            _prometheus_queue_depth_client = PrometheusQueueDepthClient.from_config(config)
 
         logging.info(f"Pipeline initialized. Queue depth: {_queue_depth}")
 
@@ -78,6 +82,15 @@ def run_pipeline(message: bytes, option_fast: str = None, option_quality: str = 
     if not source_text:
         logging.warning("Empty source text")
         raise EmptyPayloadError("Source text is empty")
+
+    if _prometheus_queue_depth_client is not None:
+        try:
+            queue_depth = _prometheus_queue_depth_client.get_llm_queue_depth()
+        except Exception as exc:
+            logging.exception("Failed to resolve queue depth from Prometheus: %s", exc)
+        else:
+            if queue_depth is not None:
+                update_queue_depth(queue_depth)
 
     # Extract features
     t_features = time.time()
