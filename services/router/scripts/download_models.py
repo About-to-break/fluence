@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-"""Download models for adaptive router."""
-
 import os
 import sys
 import urllib.request
@@ -9,12 +6,12 @@ import tempfile
 import shutil
 from huggingface_hub import hf_hub_download
 
-# ===== ПРЯМАЯ ССЫЛКА НА ТВОЙ АРХИВ =====
+# ===== ПРЯМАЯ ССЫЛКА НА АРХИВ =====
 RELEASE_URL = "https://github.com/MeLver0/sum/releases/download/Release/adaptive_router_models_v1.0.0.zip"
 
 # ===== HUGGING FACE KENLM =====
 HF_REPO_ID = "BramVanroy/kenlm_wikipedia_en"
-HF_FILENAME = "wiki_en_token.arpa.bin"
+HF_FILENAME = "wiki_en_dep.arpa.bin"
 
 # ===== ПУТИ =====
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -41,7 +38,6 @@ def download_with_progress(url, dest_path, description):
 
 
 def download_kenlm():
-    """Download KenLM model from Hugging Face."""
     dest_path = os.path.join(DATA_DIR, 'kenlm_wiki_en.bin')
 
     if os.path.exists(dest_path):

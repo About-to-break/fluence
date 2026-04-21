@@ -35,7 +35,9 @@ class RabbitProducer(MessageProducer):
 
     async def produce(self, message: dict):
         payload = json.dumps(message).encode("utf-8")
-        await self._producer.produce(payload)
+        published = await self._producer.produce(payload)
+        if published is False:
+            raise RuntimeError("RabbitProducerAIO failed to publish message")
 
     async def close(self):
         for method_name in ("close", "stop"):
