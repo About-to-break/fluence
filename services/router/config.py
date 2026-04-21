@@ -65,6 +65,10 @@ def load_config(env_file=".env") -> SimpleNamespace:
         config_vars.get("METRICS_PORT"),
         9090,
     )
+    config_vars["DECISION_METRICS_PORT"] = _to_int(
+        config_vars.get("DECISION_METRICS_PORT"),
+        9093,
+    )
     config_vars["METRICS_SERVICE_NAME"] = _normalize_metrics_service_name(
         config_vars.get("METRICS_SERVICE_NAME"),
     )

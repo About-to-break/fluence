@@ -1,0 +1,41 @@
+groups:
+  - name: router_intelligence_exact
+    rules:
+      - record: router_fast_path_share_5m
+        expr: sum(rate(router_decision_total{path="fast"}[5m])) / clamp_min(sum(rate(router_decision_total[5m])), 1e-9)
+
+      - record: router_heavy_path_share_5m
+        expr: sum(rate(router_decision_total{path="heavy"}[5m])) / clamp_min(sum(rate(router_decision_total[5m])), 1e-9)
+
+      - record: router_avg_p_llm_5m
+        expr: sum(rate(router_decision_p_llm_sum[5m])) / clamp_min(sum(rate(router_decision_p_llm_count[5m])), 1e-9)
+
+      - record: router_avg_threshold_5m
+        expr: sum(rate(router_decision_threshold_sum[5m])) / clamp_min(sum(rate(router_decision_threshold_count[5m])), 1e-9)
+
+      - record: router_avg_decision_margin_5m
+        expr: sum(rate(router_decision_margin_sum[5m])) / clamp_min(sum(rate(router_decision_margin_count[5m])), 1e-9)
+
+      - record: router_avg_queue_depth_input_5m
+        expr: sum(rate(router_decision_queue_depth_input_sum[5m])) / clamp_min(sum(rate(router_decision_queue_depth_input_count[5m])), 1e-9)
+
+      - record: router_avg_source_length_words_5m
+        expr: sum(rate(router_decision_source_length_words_sum[5m])) / clamp_min(sum(rate(router_decision_source_length_words_count[5m])), 1e-9)
+
+      - record: router_avg_log_perplexity_5m
+        expr: sum(rate(router_decision_log_perplexity_sum[5m])) / clamp_min(sum(rate(router_decision_log_perplexity_count[5m])), 1e-9)
+
+      - record: router_avg_perplexity_per_word_5m
+        expr: sum(rate(router_decision_perplexity_per_word_sum[5m])) / clamp_min(sum(rate(router_decision_perplexity_per_word_count[5m])), 1e-9)
+
+      - record: router_avg_p_llm_fast_5m
+        expr: sum(rate(router_decision_p_llm_sum{path="fast"}[5m])) / clamp_min(sum(rate(router_decision_p_llm_count{path="fast"}[5m])), 1e-9)
+
+      - record: router_avg_p_llm_heavy_5m
+        expr: sum(rate(router_decision_p_llm_sum{path="heavy"}[5m])) / clamp_min(sum(rate(router_decision_p_llm_count{path="heavy"}[5m])), 1e-9)
+
+      - record: router_avg_decision_margin_fast_5m
+        expr: sum(rate(router_decision_margin_sum{path="fast"}[5m])) / clamp_min(sum(rate(router_decision_margin_count{path="fast"}[5m])), 1e-9)
+
+      - record: router_avg_decision_margin_heavy_5m
+        expr: sum(rate(router_decision_margin_sum{path="heavy"}[5m])) / clamp_min(sum(rate(router_decision_margin_count{path="heavy"}[5m])), 1e-9)

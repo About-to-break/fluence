@@ -129,6 +129,7 @@ services:
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./monitoring/prometheus/rabbitmq_rules.yml:/etc/prometheus/rabbitmq_rules.yml:ro
+      - ./monitoring/prometheus/router_intelligence_rules.yml:/etc/prometheus/router_intelligence_rules.yml:ro
       - prometheus_data:/prometheus
     restart: unless-stopped
 

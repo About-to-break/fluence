@@ -10,7 +10,7 @@ from logging_tools import configure_global_logging
 from telephon import telemetry
 
 from config import load_config
-from internal import pipeline
+from internal import decision_metrics, pipeline
 from internal.misc import queue
 from internal.routing_core.router import NoneRouterDecisionException
 
@@ -104,6 +104,7 @@ async def handle_message(
 def serve():
     executor = None
     metrics_server = None
+    decision_metrics_server = None
 
     try:
         setup_nltk()
@@ -141,6 +142,11 @@ def serve():
             prefetch_count=config.PREFETCH_COUNT,
         )
         metrics_server.start(port=config.METRICS_PORT)
+        decision_metrics_server = decision_metrics.init_decision_metrics()
+        try:
+            decision_metrics_server.start(port=config.DECISION_METRICS_PORT)
+        except Exception as exc:
+            logging.warning("Decision metrics server did not start: %s", exc)
 
         logging.info("Server started")
 
@@ -169,6 +175,8 @@ def serve():
         logging.exception("Critical error: %s", exc)
         return
     finally:
+        if decision_metrics_server is not None:
+            decision_metrics_server.stop()
         if metrics_server is not None:
             metrics_server.stop()
         if executor is not None:
