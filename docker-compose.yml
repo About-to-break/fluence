@@ -88,22 +88,17 @@ services:
     build:
       context: services/machine_translator
       dockerfile: Dockerfile.machine_translator
-    container_name: nmt_translator
     env_file:
       - .env
-    ports:
-      - "9090:9090"
     restart: unless-stopped
     depends_on:
       rabbitmq:
         condition: service_healthy
+    networks:
+      - fluence-net
     deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [ gpu ]
+      mode: replicated
+      replicas: 8
 
   llm_translator:
       build:
