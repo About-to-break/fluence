@@ -1,0 +1,314 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "content": "## Queue / Score Comparison\nThis dashboard compares NMT and LLM queueing state side by side.\n\nAll **Approx** series use current `telephon` timing summaries and must be interpreted as operational approximations, not formula-grade measurements.",
+        "mode": "markdown"
+      },
+      "title": "About This Dashboard",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 3
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "q_rabbitmq_nmt",
+          "legendFormat": "NMT input queue",
+          "refId": "A"
+        },
+        {
+          "expr": "q_rabbitmq_llm",
+          "legendFormat": "LLM input queue",
+          "refId": "B"
+        },
+        {
+          "expr": "q_rabbitmq_out_gateway",
+          "legendFormat": "out_gateway context",
+          "refId": "C"
+        }
+      ],
+      "title": "RabbitMQ Queue Depth Comparison",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 3
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "in_flight_nmt",
+          "legendFormat": "NMT in-flight",
+          "refId": "A"
+        },
+        {
+          "expr": "in_flight_llm",
+          "legendFormat": "LLM in-flight",
+          "refId": "B"
+        }
+      ],
+      "title": "Reliable In-Flight Comparison",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 11
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "q_total_nmt",
+          "legendFormat": "NMT q_total",
+          "refId": "A"
+        },
+        {
+          "expr": "q_total_llm",
+          "legendFormat": "LLM q_total",
+          "refId": "B"
+        }
+      ],
+      "title": "Reliable q_total Comparison",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 11
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "lambda_nmt_rps",
+          "legendFormat": "NMT lambda",
+          "refId": "A"
+        },
+        {
+          "expr": "lambda_llm_rps",
+          "legendFormat": "LLM lambda",
+          "refId": "B"
+        }
+      ],
+      "title": "Reliable Lambda Comparison",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 19
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "approx_rho_nmt",
+          "legendFormat": "Approx NMT rho",
+          "refId": "A"
+        },
+        {
+          "expr": "approx_rho_llm",
+          "legendFormat": "Approx LLM rho",
+          "refId": "B"
+        }
+      ],
+      "title": "Approx Rho Comparison",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 19
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "approx_score_nmt_seconds",
+          "legendFormat": "Approx NMT score",
+          "refId": "A"
+        },
+        {
+          "expr": "approx_score_llm_seconds",
+          "legendFormat": "Approx LLM score",
+          "refId": "B"
+        }
+      ],
+      "title": "Approx Score Comparison",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": [
+    "fluence",
+    "comparison"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "Queue / Score Comparison",
+  "uid": "fluence-queue-score-comparison",
+  "version": 1
+}

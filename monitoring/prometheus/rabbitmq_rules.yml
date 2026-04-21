@@ -1,21 +1,64 @@
 groups:
-  - name: rabbitmq_formula_inputs
+  - name: reliable_formula_inputs
     rules:
-      # Queue depth from RabbitMQ is safe to use directly for q_rabbitmq.
+      - record: q_rabbitmq_router
+        expr: sum(rabbitmq_detailed_queue_messages{vhost="/fluence_translation", queue="q.in_gateway"})
+        labels:
+          service: router
+
       - record: q_rabbitmq_nmt
         expr: sum(rabbitmq_detailed_queue_messages{vhost="/fluence_translation", queue="q.router_to_nmt"})
+        labels:
+          service: nmt
 
       - record: q_rabbitmq_llm
         expr: sum(rabbitmq_detailed_queue_messages{vhost="/fluence_translation", queue="q.nmt_to_llm"})
+        labels:
+          service: llm
 
-      - record: q_rabbitmq_ez
-        expr: sum(rabbitmq_detailed_queue_messages{vhost="/fluence_translation", queue="q.router_to_ez"})
+      - record: q_rabbitmq_out_gateway
+        expr: sum(rabbitmq_detailed_queue_messages{vhost="/fluence_translation", queue="q.out_gateway"})
+        labels:
+          service: out_gateway
+
+      - record: free_slots_router
+        expr: router_free_slots
+
+      - record: free_slots_nmt
+        expr: nmt_free_slots
+
+      - record: free_slots_llm
+        expr: llm_free_slots
+
+      - record: max_concurrent_router
+        expr: router_max_concurrent
+
+      - record: max_concurrent_nmt
+        expr: nmt_max_concurrent
+
+      - record: max_concurrent_llm
+        expr: llm_max_concurrent
+
+      - record: prefetch_count_router
+        expr: router_prefetch_count
+
+      - record: prefetch_count_nmt
+        expr: nmt_prefetch_count
+
+      - record: prefetch_count_llm
+        expr: llm_prefetch_count
+
+      - record: in_flight_router
+        expr: clamp_min(prefetch_count_router - free_slots_router, 0)
 
       - record: in_flight_nmt
-        expr: clamp_min(sum(nmt_prefetch_count) - sum(nmt_free_slots), 0)
+        expr: clamp_min(prefetch_count_nmt - free_slots_nmt, 0)
 
       - record: in_flight_llm
-        expr: clamp_min(sum(llm_prefetch_count) - sum(llm_free_slots), 0)
+        expr: clamp_min(prefetch_count_llm - free_slots_llm, 0)
+
+      - record: q_total_router
+        expr: q_rabbitmq_router + in_flight_router
 
       - record: q_total_nmt
         expr: q_rabbitmq_nmt + in_flight_nmt
@@ -23,5 +66,97 @@ groups:
       - record: q_total_llm
         expr: q_rabbitmq_llm + in_flight_llm
 
-      # telephon reconstructs *_service_time_seconds_sum from a rolling average,
-      # so score/mu/rho recording rules would be approximate rather than formula-grade.
+      - record: lambda_router_rps
+        expr: rate(router_requests_total[30s])
+
+      - record: lambda_nmt_rps
+        expr: rate(nmt_requests_total[30s])
+
+      - record: lambda_llm_rps
+        expr: rate(llm_requests_total[30s])
+
+  - name: approximate_formula_inputs
+    rules:
+      # telephon reconstructs *_time_seconds_sum from a rolling average over a
+      # bounded sample window, so every approx_* rule below is an operational
+      # approximation rather than a formula-grade source-of-truth metric.
+      - record: approx_e_s_router_seconds
+        expr: rate(router_service_time_seconds_sum[30s]) / clamp_min(rate(router_service_time_seconds_count[30s]), 1e-9)
+
+      - record: approx_e_s_nmt_seconds
+        expr: rate(nmt_service_time_seconds_sum[30s]) / clamp_min(rate(nmt_service_time_seconds_count[30s]), 1e-9)
+
+      - record: approx_e_s_llm_seconds
+        expr: rate(llm_service_time_seconds_sum[30s]) / clamp_min(rate(llm_service_time_seconds_count[30s]), 1e-9)
+
+      - record: approx_e_w_router_seconds
+        expr: rate(router_wait_time_seconds_sum[30s]) / clamp_min(rate(router_wait_time_seconds_count[30s]), 1e-9)
+
+      - record: approx_e_w_nmt_seconds
+        expr: rate(nmt_wait_time_seconds_sum[30s]) / clamp_min(rate(nmt_wait_time_seconds_count[30s]), 1e-9)
+
+      - record: approx_e_w_llm_seconds
+        expr: rate(llm_wait_time_seconds_sum[30s]) / clamp_min(rate(llm_wait_time_seconds_count[30s]), 1e-9)
+
+      - record: approx_mu_router
+        expr: (1 / clamp_min(approx_e_s_router_seconds, 1e-9)) * on(service) (approx_e_s_router_seconds > bool 0)
+
+      - record: approx_mu_nmt
+        expr: (1 / clamp_min(approx_e_s_nmt_seconds, 1e-9)) * on(service) (approx_e_s_nmt_seconds > bool 0)
+
+      - record: approx_mu_llm
+        expr: (1 / clamp_min(approx_e_s_llm_seconds, 1e-9)) * on(service) (approx_e_s_llm_seconds > bool 0)
+
+      - record: approx_rho_router
+        expr: (lambda_router_rps * approx_e_s_router_seconds) / clamp_min(max_concurrent_router, 1)
+
+      - record: approx_rho_nmt
+        expr: (lambda_nmt_rps * approx_e_s_nmt_seconds) / clamp_min(max_concurrent_nmt, 1)
+
+      - record: approx_rho_llm
+        expr: (lambda_llm_rps * approx_e_s_llm_seconds) / clamp_min(max_concurrent_llm, 1)
+
+      - record: approx_score_router_seconds
+        expr: ((q_total_router + approx_rho_router) / clamp_min(approx_mu_router * clamp_min(1 - approx_rho_router, 0.01), 1e-9)) * on(service) (approx_mu_router > bool 0)
+
+      - record: approx_score_nmt_seconds
+        expr: ((q_total_nmt + approx_rho_nmt) / clamp_min(approx_mu_nmt * clamp_min(1 - approx_rho_nmt, 0.01), 1e-9)) * on(service) (approx_mu_nmt > bool 0)
+
+      - record: approx_score_llm_seconds
+        expr: ((q_total_llm + approx_rho_llm) / clamp_min(approx_mu_llm * clamp_min(1 - approx_rho_llm, 0.01), 1e-9)) * on(service) (approx_mu_llm > bool 0)
+
+      - record: approx_wait_to_service_ratio_router
+        expr: approx_e_w_router_seconds / clamp_min(approx_e_s_router_seconds, 1e-9)
+
+      - record: approx_wait_to_service_ratio_nmt
+        expr: approx_e_w_nmt_seconds / clamp_min(approx_e_s_nmt_seconds, 1e-9)
+
+      - record: approx_wait_to_service_ratio_llm
+        expr: approx_e_w_llm_seconds / clamp_min(approx_e_s_llm_seconds, 1e-9)
+
+      - record: approx_rho_warn_router
+        expr: approx_rho_router > bool 0.85
+
+      - record: approx_rho_warn_nmt
+        expr: approx_rho_nmt > bool 0.85
+
+      - record: approx_rho_warn_llm
+        expr: approx_rho_llm > bool 0.85
+
+      - record: approx_rho_crit_router
+        expr: approx_rho_router > bool 0.95
+
+      - record: approx_rho_crit_nmt
+        expr: approx_rho_nmt > bool 0.95
+
+      - record: approx_rho_crit_llm
+        expr: approx_rho_llm > bool 0.95
+
+      - record: approx_wait_service_warn_router
+        expr: approx_wait_to_service_ratio_router > bool 0.5
+
+      - record: approx_wait_service_warn_nmt
+        expr: approx_wait_to_service_ratio_nmt > bool 0.5
+
+      - record: approx_wait_service_warn_llm
+        expr: approx_wait_to_service_ratio_llm > bool 0.5
