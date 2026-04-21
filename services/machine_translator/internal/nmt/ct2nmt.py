@@ -30,8 +30,8 @@ class CT2Translator:
             model_path: str,
             tgt_lang: str,
             src_lang: str,
-            device: str = "cpu",
-            compute_type: str = "int8",
+            device: str = "cuda",
+            compute_type: str = "float16",
             intra_threads: int = 8,
             inter_threads: int = 1,
     ):

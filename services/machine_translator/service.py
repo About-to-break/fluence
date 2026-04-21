@@ -7,7 +7,7 @@ import time
 from logging_tools import configure_global_logging
 from telephon import telemetry
 from config import load_config
-from internal.misc import queue
+from internal.misc import queue_manager
 from internal.nmt import nmt, ct2nmt
 from internal import pipeline
 
@@ -67,7 +67,7 @@ async def serve():
 
         active_pipeline = pipeline.get_pipeline(config, executor=translation_executor,
                                                 max_batch_size=config.BATCHER_MAX_BATCH_SIZE)
-        broker = queue.get_broker(config)
+        broker = queue_manager.get_broker(config)
         producer = broker["producer"]
         consumer = broker["consumer"]
 
