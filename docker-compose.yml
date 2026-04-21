@@ -128,6 +128,7 @@ services:
       - "9092:9090"
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/rabbitmq_rules.yml:/etc/prometheus/rabbitmq_rules.yml:ro
       - prometheus_data:/prometheus
     restart: unless-stopped
 

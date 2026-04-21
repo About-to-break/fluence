@@ -1,0 +1,27 @@
+groups:
+  - name: rabbitmq_formula_inputs
+    rules:
+      # Queue depth from RabbitMQ is safe to use directly for q_rabbitmq.
+      - record: q_rabbitmq_nmt
+        expr: sum(rabbitmq_detailed_queue_messages{vhost="/fluence_translation", queue="q.router_to_nmt"})
+
+      - record: q_rabbitmq_llm
+        expr: sum(rabbitmq_detailed_queue_messages{vhost="/fluence_translation", queue="q.nmt_to_llm"})
+
+      - record: q_rabbitmq_ez
+        expr: sum(rabbitmq_detailed_queue_messages{vhost="/fluence_translation", queue="q.router_to_ez"})
+
+      - record: in_flight_nmt
+        expr: clamp_min(sum(nmt_prefetch_count) - sum(nmt_free_slots), 0)
+
+      - record: in_flight_llm
+        expr: clamp_min(sum(llm_prefetch_count) - sum(llm_free_slots), 0)
+
+      - record: q_total_nmt
+        expr: q_rabbitmq_nmt + in_flight_nmt
+
+      - record: q_total_llm
+        expr: q_rabbitmq_llm + in_flight_llm
+
+      # telephon reconstructs *_service_time_seconds_sum from a rolling average,
+      # so score/mu/rho recording rules would be approximate rather than formula-grade.
