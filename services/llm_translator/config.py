@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import re
 from typing import List, Dict
 from dotenv import load_dotenv
 from types import SimpleNamespace
@@ -22,6 +23,16 @@ def _to_float(value: str | None, default: float) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def _normalize_metrics_service_name(value: str | None) -> str:
+    candidate = (value or "").strip().lower()
+    candidate = re.sub(r"[^a-z0-9_]+", "_", candidate).strip("_")
+
+    if not candidate or candidate[0].isdigit():
+        return "llm"
+
+    return candidate
 
 
 def get_prompt(prompt_name: str = "default") -> List[Dict[str, str]]:
@@ -57,6 +68,9 @@ def load_config(env_file=".env") -> SimpleNamespace:
     try:
         log_level_str = config_vars.get("LOG_LEVEL", "INFO").upper()
         config_vars["LOG_LEVEL"] = getattr(logging, log_level_str, logging.INFO)
+        config_vars["METRICS_SERVICE_NAME"] = _normalize_metrics_service_name(
+            config_vars.get("METRICS_SERVICE_NAME", "llm")
+        )
 
         if "OPENAI_API_TIMEOUT" in config_vars:
             config_vars["OPENAI_API_TIMEOUT"] = _to_int(config_vars["OPENAI_API_TIMEOUT"], 10)

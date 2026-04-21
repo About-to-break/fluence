@@ -57,6 +57,6 @@ COPY internal/ ./internal/
 
 
 # Порт для метрик (если добавим Prometheus)
-EXPOSE 8000
+EXPOSE 9090
 
 CMD ["python", "service.py"]

@@ -8,6 +8,8 @@ import logging
 import os
 from types import SimpleNamespace
 
+from . import decision_metrics
+
 # Импорты из routing_core
 from .routing_core.features import FeatureExtractor
 from .routing_core.router import get_router, HysteresisRouter
@@ -94,6 +96,13 @@ def run_pipeline(message: bytes, option_fast: str = None, option_quality: str = 
         logging.error(f"Router decision failed: {e}")
         raise NoneRouterDecisionException(f"Router error: {e}")
     logging.debug(f"Router: {(time.time() - t_router) * 1000:.2f} ms")
+
+    try:
+        collector = decision_metrics.get_decision_metrics()
+        if collector is not None:
+            collector.record_decision(decision, "heavy" if decision.use_llm else "fast")
+    except Exception as exc:
+        logging.exception("Decision metrics emission failed: %s", exc)
 
     # Log decision
     logging.info(

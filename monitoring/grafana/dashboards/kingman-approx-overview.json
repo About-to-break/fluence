@@ -1,0 +1,364 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "content": "## Kingman Approx Overview\nThis dashboard breaks the current queueing formula into exact and approximate parts.\n\n- Exact broker-side inputs: `q_rabbitmq_*`\n- Reliable service-capacity inputs: `free_slots_*`, `in_flight_*`, `q_total_*`, `lambda_*`\n- Approximate timing / queueing outputs: `approx_e_s_*`, `approx_mu_*`, `approx_rho_*`, `approx_score_*`\n\nCurrent `telephon` timing `_sum/_count` are reconstructed from rolling averages, so all **Approx** series are operational approximations only.",
+        "mode": "markdown"
+      },
+      "title": "Formula Caveats",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "q_rabbitmq_router",
+          "legendFormat": "router input",
+          "refId": "A"
+        },
+        {
+          "expr": "q_rabbitmq_nmt",
+          "legendFormat": "nmt input",
+          "refId": "B"
+        },
+        {
+          "expr": "q_rabbitmq_llm",
+          "legendFormat": "llm input",
+          "refId": "C"
+        }
+      ],
+      "title": "Exact Queue Inputs",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "q_total_router",
+          "legendFormat": "router q_total",
+          "refId": "A"
+        },
+        {
+          "expr": "q_total_nmt",
+          "legendFormat": "nmt q_total",
+          "refId": "B"
+        },
+        {
+          "expr": "q_total_llm",
+          "legendFormat": "llm q_total",
+          "refId": "C"
+        }
+      ],
+      "title": "Reliable q_total",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "approx_e_s_nmt_seconds",
+          "legendFormat": "Approx NMT E[S]",
+          "refId": "A"
+        },
+        {
+          "expr": "approx_e_s_llm_seconds",
+          "legendFormat": "Approx LLM E[S]",
+          "refId": "B"
+        },
+        {
+          "expr": "approx_e_w_nmt_seconds",
+          "legendFormat": "Approx NMT E[W]",
+          "refId": "C"
+        },
+        {
+          "expr": "approx_e_w_llm_seconds",
+          "legendFormat": "Approx LLM E[W]",
+          "refId": "D"
+        }
+      ],
+      "title": "Approx Timing Inputs",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "approx_mu_nmt",
+          "legendFormat": "Approx NMT mu",
+          "refId": "A"
+        },
+        {
+          "expr": "approx_mu_llm",
+          "legendFormat": "Approx LLM mu",
+          "refId": "B"
+        },
+        {
+          "expr": "approx_rho_nmt",
+          "legendFormat": "Approx NMT rho",
+          "refId": "C"
+        },
+        {
+          "expr": "approx_rho_llm",
+          "legendFormat": "Approx LLM rho",
+          "refId": "D"
+        }
+      ],
+      "title": "Approx Mu And Rho",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "approx_score_router_seconds",
+          "legendFormat": "Approx router score",
+          "refId": "A"
+        },
+        {
+          "expr": "approx_score_nmt_seconds",
+          "legendFormat": "Approx nmt score",
+          "refId": "B"
+        },
+        {
+          "expr": "approx_score_llm_seconds",
+          "legendFormat": "Approx llm score",
+          "refId": "C"
+        }
+      ],
+      "title": "Approx Score",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "approx_rho_warn_nmt",
+          "legendFormat": "Approx NMT rho warn",
+          "refId": "A"
+        },
+        {
+          "expr": "approx_rho_crit_nmt",
+          "legendFormat": "Approx NMT rho crit",
+          "refId": "B"
+        },
+        {
+          "expr": "approx_wait_service_warn_nmt",
+          "legendFormat": "Approx NMT wait/service warn",
+          "refId": "C"
+        },
+        {
+          "expr": "approx_rho_warn_llm",
+          "legendFormat": "Approx LLM rho warn",
+          "refId": "D"
+        },
+        {
+          "expr": "approx_rho_crit_llm",
+          "legendFormat": "Approx LLM rho crit",
+          "refId": "E"
+        },
+        {
+          "expr": "approx_wait_service_warn_llm",
+          "legendFormat": "Approx LLM wait/service warn",
+          "refId": "F"
+        }
+      ],
+      "title": "Approx Degradation Indicators",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": [
+    "fluence",
+    "kingman"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "Kingman Approx Overview",
+  "uid": "fluence-kingman-approx",
+  "version": 1
+}

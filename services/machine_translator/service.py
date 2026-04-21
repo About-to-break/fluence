@@ -58,7 +58,7 @@ async def serve():
         else:
             raise ValueError("Pipeline type not supported")
 
-        metrics_server = telemetry.init_metrics(service_name="nmt service",
+        metrics_server = telemetry.init_metrics(service_name=config.METRICS_SERVICE_NAME,
                                                 max_concurrent=int(config.MAX_CONCURRENT_REQUESTS),
                                                 prefetch_count=int(config.PREFETCH_COUNT)
                                                 )
