@@ -7,11 +7,12 @@ import time
 from logging_tools import configure_global_logging
 from telephon import telemetry
 from config import load_config
-from internal.misc import queue
+from internal.misc import queue_manager
 from internal.nmt import nmt, ct2nmt
 from internal import pipeline
 
 translation_executor = None
+
 
 async def serve():
     try:
@@ -64,8 +65,9 @@ async def serve():
 
         handler_semaphore = asyncio.Semaphore(int(config.MAX_CONCURRENT_REQUESTS))
 
-        active_pipeline = pipeline.get_pipeline(config, executor=translation_executor)
-        broker = queue.get_broker(config)
+        active_pipeline = pipeline.get_pipeline(config, executor=translation_executor,
+                                                max_batch_size=config.BATCHER_MAX_BATCH_SIZE)
+        broker = queue_manager.get_broker(config)
         producer = broker["producer"]
         consumer = broker["consumer"]
 
@@ -86,25 +88,29 @@ async def serve():
                     await producer.produce(result)
                     await message.ack()
                     logging.debug(f"Successfully processed message")
-                    metrics_server.record_request_end(success=True, wait_time=t_hand - t_arr, service_time=time.monotonic() - t_hand)
+                    metrics_server.record_request_end(success=True, wait_time=t_hand - t_arr,
+                                                      service_time=time.monotonic() - t_hand)
                     return result
 
                 except pipeline.EmptyPayloadError as e0:
                     logging.warning(f"Empty payload, discarding: {e0}")
-                    metrics_server.record_request_end(success=True, wait_time=t_hand - t_arr, service_time=time.monotonic() - t_hand)
+                    metrics_server.record_request_end(success=True, wait_time=t_hand - t_arr,
+                                                      service_time=time.monotonic() - t_hand)
                     await message.nack(requeue=False)
                     return None
 
                 except nmt.TranslationEmptyError as e1:
                     logging.error(f"Empty response, sending original: {e1}")
-                    metrics_server.record_request_end(success=False, wait_time=t_hand - t_arr, service_time=time.monotonic() - t_hand)
+                    metrics_server.record_request_end(success=False, wait_time=t_hand - t_arr,
+                                                      service_time=time.monotonic() - t_hand)
                     await producer.produce(message.body)
                     await message.ack()
                     return message.body.decode()
 
                 except Exception as e2:
                     logging.exception(f"Unexpected error, requeue: {e2}")
-                    metrics_server.record_request_end(success=False, wait_time=t_hand - t_arr, service_time=time.monotonic() - t_hand)
+                    metrics_server.record_request_end(success=False, wait_time=t_hand - t_arr,
+                                                      service_time=time.monotonic() - t_hand)
                     await message.nack(requeue=True)
                     raise
 

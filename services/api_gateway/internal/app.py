@@ -1,5 +1,4 @@
 import asyncio
-import orjson
 import logging
 from contextlib import asynccontextmanager, suppress
 from types import SimpleNamespace
@@ -17,6 +16,7 @@ from .models import (
     TranslateRequest,
     TranslateStatusResponse,
 )
+from .output_consumer import process_output_message
 from .queue import MessageConsumer, MessageProducer, get_consumer, get_producer
 from .store import InMemoryJobStore
 
@@ -38,64 +38,6 @@ def _resolve_consumer(
 
     return get_consumer(config)
 
-
-def apply_output_payload(
-    job_store: InMemoryJobStore,
-    clock: LamportClock,
-    payload: dict,
-):
-    job_uuid = payload.get("uuid")
-    if not isinstance(job_uuid, str) or job_uuid == "":
-        logging.warning("Skipping q.out_gateway payload without uuid")
-        return None
-
-    existing_job = job_store.get(job_uuid)
-    if existing_job is None:
-        logging.warning("Skipping q.out_gateway payload for unknown job %s", job_uuid)
-        return None
-
-    remote_lamport_ts = payload.get("lamport_ts")
-    local_lamport_ts = None
-    if isinstance(remote_lamport_ts, int):
-        local_lamport_ts = clock.update(remote_lamport_ts)
-
-    error_detail = payload.get("error_detail") or payload.get("error")
-    status_value = payload.get("status")
-    if isinstance(status_value, str) and status_value.lower() in {"failed", "error"}:
-        return job_store.set_result(
-            job_uuid,
-            JobStatus.FAILED,
-            lamport_ts=local_lamport_ts,
-            translated_text=None,
-            error_detail=str(error_detail or "Translation failed"),
-        )
-
-    translated_text = payload.get("translated_text")
-    if translated_text is None:
-        translated_text = payload.get("text")
-
-    if isinstance(translated_text, str) and translated_text != "":
-        return job_store.set_result(
-            job_uuid,
-            JobStatus.COMPLETED,
-            lamport_ts=local_lamport_ts,
-            translated_text=translated_text,
-            error_detail=None,
-        )
-
-    if error_detail is not None:
-        return job_store.set_result(
-            job_uuid,
-            JobStatus.FAILED,
-            lamport_ts=local_lamport_ts,
-            translated_text=None,
-            error_detail=str(error_detail),
-        )
-
-    logging.warning("Skipping unsupported q.out_gateway payload for job %s", job_uuid)
-    return None
-
-
 def create_app(
     config: SimpleNamespace,
     producer: MessageProducer | None = None,
@@ -112,14 +54,8 @@ def create_app(
     async def lifespan(app: FastAPI):
         consumer_task = None
 
-        async def handle_output_message(message, **kwargs):
-            try:
-                payload = orjson.loads(message.body.decode("utf-8"))
-            except (AttributeError, UnicodeDecodeError, orjson.JSONDecodeError):
-                logging.warning("Skipping malformed q.out_gateway payload")
-                return
-
-            apply_output_payload(job_store, clock, payload)
+        async def handle_output_message(message):
+            await process_output_message(message, job_store, clock)
 
         async def run_output_consumer():
             if message_consumer is None:

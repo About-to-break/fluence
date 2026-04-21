@@ -37,7 +37,7 @@ def run_test_pipeline(translator, message: bytes):
     return message
 
 
-async def run_batch_pipeline(translator: CT2Translator, message: bytes, executor=None):
+async def run_batch_pipeline(translator: CT2Translator, message: bytes, executor=None, max_batch_size=8):
     """
     Новый пайплайн — асинхронный батчинг.
     translator здесь используется только для получения batcher'а.
@@ -49,7 +49,7 @@ async def run_batch_pipeline(translator: CT2Translator, message: bytes, executor
     if text == "" or uuid == "":
         raise EmptyPayloadError("Empty payload")
 
-    batcher = get_batcher(translator, executor=executor)
+    batcher = get_batcher(translator, executor=executor, max_batch_size=max_batch_size)
     translation = await batcher.translate(text)
 
     if translation == "":
@@ -58,12 +58,12 @@ async def run_batch_pipeline(translator: CT2Translator, message: bytes, executor
     return orjson.dumps({"uuid": uuid, "text": translation})
 
 
-def get_pipeline(config: SimpleNamespace, executor=None):
+def get_pipeline(config: SimpleNamespace, executor=None, max_batch_size=8):
     if config.PIPELINE == "prod":
         return run_pipeline
     elif config.PIPELINE == "batch":
         async def batch_with_executor(translator, message, **kwargs):
-            return await run_batch_pipeline(translator, message, executor=executor)
+            return await run_batch_pipeline(translator, message, executor=executor, max_batch_size=max_batch_size)
 
         return batch_with_executor
     elif config.PIPELINE == "test":
