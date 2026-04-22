@@ -10,6 +10,7 @@ from types import SimpleNamespace
 
 from . import decision_metrics
 from .prometheus_queue_depth import PrometheusQueueDepthClient
+from .prometheus_routing import PrometheusRoutingClient, RoutingMetricsSnapshot
 
 # Импорты из routing_core
 from .routing_core.features import FeatureExtractor
@@ -20,6 +21,7 @@ _extractor: FeatureExtractor = None
 _router: HysteresisRouter = None
 _queue_depth: int = 0
 _prometheus_queue_depth_client: PrometheusQueueDepthClient | None = None
+_prometheus_routing_client: PrometheusRoutingClient | None = None
 
 
 class EmptyPayloadError(Exception):
@@ -34,7 +36,7 @@ class NoneRouterDecisionException(Exception):
 
 def _initialize(config: SimpleNamespace = None):
     """Initialize feature extractor and router (called once)."""
-    global _extractor, _router, _queue_depth, _prometheus_queue_depth_client
+    global _extractor, _router, _queue_depth, _prometheus_queue_depth_client, _prometheus_routing_client
 
     if _extractor is None:
         # Пути к моделям
@@ -44,12 +46,18 @@ def _initialize(config: SimpleNamespace = None):
 
         kenlm_path = os.path.join(data_dir, 'kenlm_wiki_en.bin')
         _extractor = FeatureExtractor(kenlm_path)
-        _router = get_router(models_dir)
+        _router = get_router(
+            models_dir,
+            p_llm_threshold=getattr(config, "ROUTER_P_LLM_THRESHOLD", 0.45),
+            overload_enter_rho=getattr(config, "ROUTER_OVERLOAD_ENTER_RHO", 0.8),
+            overload_exit_rho=getattr(config, "ROUTER_OVERLOAD_EXIT_RHO", 0.75),
+        )
 
         # Установить начальную глубину очереди из конфига
         if config and hasattr(config, 'QUEUE_DEPTH_STATIC'):
             _queue_depth = int(config.QUEUE_DEPTH_STATIC)
         if config and getattr(config, "PROMETHEUS_ENABLED", False):
+            _prometheus_routing_client = PrometheusRoutingClient.from_config(config)
             _prometheus_queue_depth_client = PrometheusQueueDepthClient.from_config(config)
 
         logging.info(f"Pipeline initialized. Queue depth: {_queue_depth}")
@@ -67,6 +75,7 @@ def update_queue_depth(depth: int):
 def run_pipeline(message: bytes, option_fast: str = None, option_quality: str = None) -> str:
     global _queue_depth
     t_total = time.time()
+    routing_snapshot: RoutingMetricsSnapshot | None = None
 
     # Parse message
     t_parse = time.time()
@@ -83,7 +92,13 @@ def run_pipeline(message: bytes, option_fast: str = None, option_quality: str = 
         logging.warning("Empty source text")
         raise EmptyPayloadError("Source text is empty")
 
-    if _prometheus_queue_depth_client is not None:
+    if _prometheus_routing_client is not None:
+        try:
+            routing_snapshot = _prometheus_routing_client.get_routing_snapshot()
+        except Exception as exc:
+            logging.exception("Failed to resolve routing snapshot from Prometheus: %s", exc)
+
+    if routing_snapshot is None and _prometheus_queue_depth_client is not None:
         try:
             queue_depth = _prometheus_queue_depth_client.get_llm_queue_depth()
         except Exception as exc:
@@ -104,7 +119,7 @@ def run_pipeline(message: bytes, option_fast: str = None, option_quality: str = 
     # Make routing decision
     t_router = time.time()
     try:
-        decision = _router.should_use_llm(features, _queue_depth)
+        decision = _router.should_use_llm(features, _queue_depth, routing_snapshot=routing_snapshot)
     except Exception as e:
         logging.error(f"Router decision failed: {e}")
         raise NoneRouterDecisionException(f"Router error: {e}")

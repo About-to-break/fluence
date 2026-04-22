@@ -111,5 +111,17 @@ def load_config(env_file=".env") -> SimpleNamespace:
         config_vars.get("PROMETHEUS_QUERY_TTL_SECONDS"),
         15.0,
     )
+    config_vars["ROUTER_P_LLM_THRESHOLD"] = _to_float(
+        config_vars.get("ROUTER_P_LLM_THRESHOLD"),
+        0.45,
+    )
+    config_vars["ROUTER_OVERLOAD_ENTER_RHO"] = _to_float(
+        config_vars.get("ROUTER_OVERLOAD_ENTER_RHO"),
+        0.8,
+    )
+    config_vars["ROUTER_OVERLOAD_EXIT_RHO"] = _to_float(
+        config_vars.get("ROUTER_OVERLOAD_EXIT_RHO"),
+        0.75,
+    )
 
     return SimpleNamespace(**config_vars)
