@@ -7,6 +7,8 @@ import numpy as np
 from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional
 
+from ..prometheus_routing import RoutingMetricsSnapshot
+
 logger = logging.getLogger(__name__)
 class NoneRouterDecisionException(Exception):
     """Raised when router fails to make a decision."""
@@ -18,14 +20,22 @@ class InternalDecision:
     p_llm: float
     threshold: float
     mode: str
-    queue_depth: int
+    queue_depth: Optional[int]
     features: Dict[str, float]
     timestamp: float = field(default_factory=time.time)
 
 
 class HysteresisRouter:
 
-    def __init__(self, config_path: str, model_path: str):
+    def __init__(
+        self,
+        config_path: str,
+        model_path: str,
+        *,
+        p_llm_threshold: float = 0.45,
+        overload_enter_rho: float = 0.8,
+        overload_exit_rho: float = 0.75,
+    ):
         with open(config_path, 'r', encoding='utf-8') as f:
             self.config = json.load(f)
 
@@ -50,6 +60,12 @@ class HysteresisRouter:
         }
 
         self.current_mode = 'normal'
+        self.routing_mode = 'healthy'
+        self.p_llm_threshold = float(p_llm_threshold)
+        self.overload_enter_rho = max(float(overload_enter_rho), 0.0)
+        self.overload_exit_rho = max(float(overload_exit_rho), 0.0)
+        if self.overload_exit_rho > self.overload_enter_rho:
+            self.overload_exit_rho = self.overload_enter_rho
         self.mode_history: List[Dict] = []
 
         self.stats = {
@@ -89,7 +105,7 @@ class HysteresisRouter:
                 'queue_depth': queue_depth
             })
             self.stats['mode_changes'] += 1
-            logger.warning(f"Mode changed: {prev_mode} → {self.current_mode} (queue: {queue_depth})")
+            logger.warning(f"Mode changed: {prev_mode} -> {self.current_mode} (queue: {queue_depth})")
 
         return self.current_mode
 
@@ -97,14 +113,58 @@ class HysteresisRouter:
         self.update_mode(queue_depth)
         return self.thresholds[self.current_mode]
 
-    def should_use_llm(self, features: Dict[str, float], queue_depth: int) -> InternalDecision:
+    def update_routing_mode(self, routing_snapshot: RoutingMetricsSnapshot) -> str:
+        prev_mode = self.routing_mode
+        system_rho = routing_snapshot.system_rho
+
+        if self.routing_mode == 'healthy':
+            if system_rho >= self.overload_enter_rho:
+                self.routing_mode = 'overloaded'
+        elif self.routing_mode == 'overloaded':
+            if system_rho <= self.overload_exit_rho:
+                self.routing_mode = 'healthy'
+
+        if prev_mode != self.routing_mode:
+            self.mode_history.append({
+                'timestamp': time.time(),
+                'from_mode': prev_mode,
+                'to_mode': self.routing_mode,
+                'system_rho': system_rho,
+                'rho_nmt': routing_snapshot.rho_nmt,
+                'rho_llm': routing_snapshot.rho_llm,
+                'source': 'prometheus',
+            })
+            self.stats['mode_changes'] += 1
+            logger.warning(
+                "Routing mode changed: %s -> %s (system_rho=%.3f)",
+                prev_mode,
+                self.routing_mode,
+                system_rho,
+            )
+
+        return self.routing_mode
+
+    def should_use_llm(
+        self,
+        features: Dict[str, float],
+        queue_depth: int,
+        routing_snapshot: Optional[RoutingMetricsSnapshot] = None,
+    ) -> InternalDecision:
         X = np.array([[features.get(name, 0) for name in self.feature_names]])
 
         p_llm = self.model.predict_proba(X)[0, 1]
 
-        threshold = self.get_threshold(queue_depth)
-
-        use_llm = p_llm > threshold
+        if routing_snapshot is not None:
+            mode = self.update_routing_mode(routing_snapshot)
+            threshold = self.p_llm_threshold
+            if mode == 'healthy':
+                use_llm = p_llm >= threshold
+            else:
+                use_llm = routing_snapshot.score_llm <= routing_snapshot.score_nmt
+        else:
+            threshold = self.get_threshold(queue_depth)
+            use_llm = p_llm > threshold
+            mode = self.current_mode
 
         self.stats['total_requests'] += 1
         if use_llm:
@@ -116,7 +176,7 @@ class HysteresisRouter:
             use_llm=use_llm,
             p_llm=p_llm,
             threshold=threshold,
-            mode=self.current_mode,
+            mode=mode,
             queue_depth=queue_depth,
             features=features
         )
@@ -129,14 +189,21 @@ class HysteresisRouter:
             'nmt_requests': self.stats['nmt_requests'],
             'llm_ratio': self.stats['llm_requests'] / total if total > 0 else 0,
             'mode_changes': self.stats['mode_changes'],
-            'current_mode': self.current_mode
+            'current_mode': self.current_mode,
+            'routing_mode': self.routing_mode,
         }
 
 
 _router: Optional[HysteresisRouter] = None
 
 
-def get_router(models_dir: str = None) -> HysteresisRouter:
+def get_router(
+    models_dir: str = None,
+    *,
+    p_llm_threshold: float = 0.45,
+    overload_enter_rho: float = 0.8,
+    overload_exit_rho: float = 0.75,
+) -> HysteresisRouter:
     global _router
 
     if _router is None:
@@ -146,6 +213,12 @@ def get_router(models_dir: str = None) -> HysteresisRouter:
         config_path = os.path.join(models_dir, 'router_config_xgb.json')
         model_path = os.path.join(models_dir, 'router_classifier_xgb.joblib')
 
-        _router = HysteresisRouter(config_path, model_path)
+        _router = HysteresisRouter(
+            config_path,
+            model_path,
+            p_llm_threshold=p_llm_threshold,
+            overload_enter_rho=overload_enter_rho,
+            overload_exit_rho=overload_exit_rho,
+        )
 
     return _router

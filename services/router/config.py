@@ -20,6 +20,29 @@ def _to_int(value: str | None, default: int) -> int:
         return default
 
 
+def _to_float(value: str | None, default: float) -> float:
+    if value is None:
+        return default
+
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _to_bool(value: str | None, default: bool) -> bool:
+    if value is None:
+        return default
+
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+
+    return default
+
+
 def _normalize_metrics_service_name(
     value: str | None,
     default: str = _DEFAULT_METRICS_SERVICE_NAME,
@@ -71,6 +94,34 @@ def load_config(env_file=".env") -> SimpleNamespace:
     )
     config_vars["METRICS_SERVICE_NAME"] = _normalize_metrics_service_name(
         config_vars.get("METRICS_SERVICE_NAME"),
+    )
+    config_vars["PROMETHEUS_ENABLED"] = _to_bool(
+        config_vars.get("PROMETHEUS_ENABLED"),
+        True,
+    )
+    config_vars["PROMETHEUS_URL"] = config_vars.get(
+        "PROMETHEUS_URL",
+        "http://prometheus:9090",
+    )
+    config_vars["PROMETHEUS_TIMEOUT_SECONDS"] = _to_float(
+        config_vars.get("PROMETHEUS_TIMEOUT_SECONDS"),
+        1.0,
+    )
+    config_vars["PROMETHEUS_QUERY_TTL_SECONDS"] = _to_float(
+        config_vars.get("PROMETHEUS_QUERY_TTL_SECONDS"),
+        15.0,
+    )
+    config_vars["ROUTER_P_LLM_THRESHOLD"] = _to_float(
+        config_vars.get("ROUTER_P_LLM_THRESHOLD"),
+        0.45,
+    )
+    config_vars["ROUTER_OVERLOAD_ENTER_RHO"] = _to_float(
+        config_vars.get("ROUTER_OVERLOAD_ENTER_RHO"),
+        0.8,
+    )
+    config_vars["ROUTER_OVERLOAD_EXIT_RHO"] = _to_float(
+        config_vars.get("ROUTER_OVERLOAD_EXIT_RHO"),
+        0.75,
     )
 
     return SimpleNamespace(**config_vars)

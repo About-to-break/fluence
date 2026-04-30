@@ -8,7 +8,7 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 _ALLOWED_PATHS = ("fast", "heavy")
-_ALLOWED_MODES = ("low", "normal", "high", "critical")
+_ALLOWED_MODES = ("low", "normal", "high", "critical", "healthy", "overloaded")
 _SUMMARY_METRICS = (
     ("p_llm", "router_decision_p_llm", "Exact p_llm observations"),
     ("threshold", "router_decision_threshold", "Exact threshold observations"),
@@ -21,10 +21,11 @@ _SUMMARY_METRICS = (
 
 
 def _coerce_numeric(value) -> float | None:
-    if not isinstance(value, (int, float)):
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
         return None
 
-    numeric = float(value)
     if not math.isfinite(numeric):
         return None
 
