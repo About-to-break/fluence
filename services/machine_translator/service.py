@@ -66,7 +66,8 @@ async def serve():
         handler_semaphore = asyncio.Semaphore(int(config.MAX_CONCURRENT_REQUESTS))
 
         active_pipeline = pipeline.get_pipeline(config, executor=translation_executor,
-                                                max_batch_size=config.BATCHER_MAX_BATCH_SIZE)
+                                                max_batch_size=config.BATCHER_MAX_BATCH_SIZE,
+                                                max_wait=config.BATCHER_MAX_WAIT / 1000,)
         broker = queue_manager.get_broker(config)
         producer = broker["producer"]
         consumer = broker["consumer"]

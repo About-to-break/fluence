@@ -11,3 +11,6 @@ def healthcheck() -> bool:
     except Exception as e:
         logging.error(e)
         return False
+
+if __name__ == '__main__':
+    print(healthcheck())

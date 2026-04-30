@@ -30,9 +30,9 @@ async def run_pipeline(connector: VLLMConnector, max_tokens: int, message: bytes
 
         logging.info(f"Translated text: {translation}")
 
-        new_message = orjson.dumps({"uuid": uuid, "text": translation})
+        parsed_body.update({"uuid": uuid, "text": translation})
 
-        return new_message
+        return orjson.dumps(parsed_body)
 
     except VLLMTimeoutError as e:
         raise VLLMTimeoutError(f"Encountered vLLM timeout error with {uuid}, fallbacking to nmt...") from e

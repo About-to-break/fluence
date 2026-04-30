@@ -243,9 +243,9 @@ class Batcher:
 _batcher: Optional[Batcher] = None
 
 
-def get_batcher(translator: CT2Translator, executor=None, max_batch_size: int = 8) -> Batcher:
+def get_batcher(translator: CT2Translator, executor=None, max_batch_size: int = 8, max_wait=0.03) -> Batcher:
     global _batcher
     if _batcher is None:
         logger.info(f"Creating global batcher instance with max_batch_size={max_batch_size}")
-        _batcher = Batcher(translator, executor=executor, max_batch_size=max_batch_size)
+        _batcher = Batcher(translator, executor=executor, max_batch_size=max_batch_size, max_wait=max_wait)
     return _batcher
