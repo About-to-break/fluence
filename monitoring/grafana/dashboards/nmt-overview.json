@@ -15,7 +15,7 @@
       },
       "id": 1,
       "options": {
-        "content": "## NMT Overview\nThis dashboard combines raw `telephon` metrics, RabbitMQ queue depth, reliable derived metrics, and clearly labeled **Approx** formula metrics.\n\n`q.out_gateway` is not used as a main formula input. Downstream context here is `q.nmt_to_llm`.",
+        "content": "## NMT Overview\nThis dashboard combines raw `telephon` metrics, RabbitMQ queue depth, reliable derived metrics, and clearly labeled **Approx** formula metrics.\n\nFast path = NMT. `approx_score_nmt_seconds` is the unweighted NMT base score before router-side `p_llm` weighting. `q.out_gateway` is not used as a main formula input. Downstream context here is `q.nmt_to_llm`.",
         "mode": "markdown"
       },
       "title": "About This Dashboard",
@@ -580,12 +580,12 @@
       },
       "targets": [
         {
-          "expr": "approx_e_s_nmt_seconds",
+          "expr": "approx_backlog_drain_nmt_seconds",
           "legendFormat": "nmt",
           "refId": "A"
         }
       ],
-      "title": "Approx E[S] NMT",
+      "title": "Approx Backlog Drain NMT",
       "type": "stat"
     },
     {
@@ -596,7 +596,7 @@
       "fieldConfig": {
         "defaults": {
           "noValue": "No data",
-          "unit": "ops"
+          "unit": "s"
         },
         "overrides": []
       },
@@ -623,12 +623,12 @@
       },
       "targets": [
         {
-          "expr": "approx_mu_nmt",
+          "expr": "approx_kingman_penalty_nmt_seconds",
           "legendFormat": "nmt",
           "refId": "A"
         }
       ],
-      "title": "Approx Mu NMT",
+      "title": "Approx Kingman Penalty NMT",
       "type": "stat"
     },
     {
@@ -732,7 +732,7 @@
           "refId": "A"
         }
       ],
-      "title": "Approx Score NMT",
+      "title": "Approx Base Score NMT",
       "type": "stat"
     },
     {

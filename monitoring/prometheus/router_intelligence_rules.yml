@@ -10,6 +10,12 @@ groups:
       - record: router_avg_p_llm_5m
         expr: sum(rate(router_decision_p_llm_sum[5m])) / clamp_min(sum(rate(router_decision_p_llm_count[5m])), 1e-9)
 
+      - record: router_formula_mode_share_5m
+        expr: sum(rate(router_decision_total{mode="formula"}[5m])) / clamp_min(sum(rate(router_decision_total[5m])), 1e-9)
+
+      - record: router_fallback_mode_share_5m
+        expr: sum(rate(router_decision_total{mode!="formula"}[5m])) / clamp_min(sum(rate(router_decision_total[5m])), 1e-9)
+
       - record: router_avg_threshold_5m
         expr: sum(rate(router_decision_threshold_sum[5m])) / clamp_min(sum(rate(router_decision_threshold_count[5m])), 1e-9)
 

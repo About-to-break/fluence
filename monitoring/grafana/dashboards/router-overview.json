@@ -15,7 +15,7 @@
       },
       "id": 1,
       "options": {
-        "content": "## Router Overview\nRaw `telephon` metrics are shown separately from RabbitMQ queue depth and derived metrics.\n\nPanels prefixed with **Approx** use `telephon` timing summaries that are reconstructed from rolling averages and should be treated as operational approximations, not formula-grade source-of-truth values.",
+        "content": "## Router Overview\nRaw `telephon` metrics are shown separately from RabbitMQ queue depth and derived metrics.\n\nPanels prefixed with **Approx** use `telephon` timing summaries that are reconstructed from rolling averages and should be treated as operational approximations, not formula-grade source-of-truth values. `approx_score_router_seconds` is router-service context only and is not the fast-vs-heavy path decision score.",
         "mode": "markdown"
       },
       "title": "About This Dashboard",
@@ -716,7 +716,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Approximate formula-derived metric from current telephon timing summaries.",
+      "description": "Approximate router-service context metric from current telephon timing summaries. This is not the fast-vs-heavy path decision score.",
       "fieldConfig": {
         "defaults": {
           "noValue": "No data",
@@ -752,7 +752,7 @@
           "refId": "A"
         }
       ],
-      "title": "Approx Score Router",
+      "title": "Approx Score Router Context",
       "type": "stat"
     },
     {

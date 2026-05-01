@@ -15,7 +15,7 @@
       },
       "id": 1,
       "options": {
-        "content": "## Queue / Score Comparison\nThis dashboard compares NMT and LLM queueing state side by side.\n\nAll **Approx** series use current `telephon` timing summaries and must be interpreted as operational approximations, not formula-grade measurements.",
+        "content": "## Queue / Score Comparison\nThis dashboard compares the NMT fast path and LLM heavy path side by side.\n\nAll **Approx** series use current `telephon` timing summaries and must be interpreted as operational approximations, not formula-grade measurements. `approx_score_nmt_seconds` and `approx_score_llm_seconds` are unweighted base scores only; the router still applies per-request `w_fast = 1 + alpha * p_llm` and `w_heavy = 1 + alpha * (1 - p_llm)` before choosing the smaller weighted score.",
         "mode": "markdown"
       },
       "title": "About This Dashboard",
@@ -252,6 +252,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "Approximate backlog-drain term (`q_total / mu`) for the NMT fast path and LLM heavy path.",
       "fieldConfig": {
         "defaults": {
           "noValue": "No data",
@@ -279,17 +280,109 @@
       },
       "targets": [
         {
+          "expr": "approx_backlog_drain_nmt_seconds",
+          "legendFormat": "Approx NMT backlog drain",
+          "refId": "A"
+        },
+        {
+          "expr": "approx_backlog_drain_llm_seconds",
+          "legendFormat": "Approx LLM backlog drain",
+          "refId": "B"
+        }
+      ],
+      "title": "Approx Backlog Drain Comparison",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Approximate Kingman congestion-penalty term for the NMT fast path and LLM heavy path.",
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 27
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "approx_kingman_penalty_nmt_seconds",
+          "legendFormat": "Approx NMT Kingman penalty",
+          "refId": "A"
+        },
+        {
+          "expr": "approx_kingman_penalty_llm_seconds",
+          "legendFormat": "Approx LLM Kingman penalty",
+          "refId": "B"
+        }
+      ],
+      "title": "Approx Kingman Penalty Comparison",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Approximate unweighted base scores before router-side `p_llm` weighting.",
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 27
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
           "expr": "approx_score_nmt_seconds",
-          "legendFormat": "Approx NMT score",
+          "legendFormat": "Approx NMT base score",
           "refId": "A"
         },
         {
           "expr": "approx_score_llm_seconds",
-          "legendFormat": "Approx LLM score",
+          "legendFormat": "Approx LLM base score",
           "refId": "B"
         }
       ],
-      "title": "Approx Score Comparison",
+      "title": "Approx Base Score Comparison",
       "type": "timeseries"
     }
   ],

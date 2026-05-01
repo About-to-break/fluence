@@ -15,7 +15,7 @@
       },
       "id": 1,
       "options": {
-        "content": "## Kingman Approx Overview\nThis dashboard breaks the current queueing formula into exact and approximate parts.\n\n- Exact broker-side inputs: `q_rabbitmq_*`\n- Reliable service-capacity inputs: `free_slots_*`, `in_flight_*`, `q_total_*`, `lambda_*`\n- Approximate timing / queueing outputs: `approx_e_s_*`, `approx_mu_*`, `approx_rho_*`, `approx_score_*`\n\nCurrent `telephon` timing `_sum/_count` are reconstructed from rolling averages, so all **Approx** series are operational approximations only.",
+        "content": "## Kingman Approx Overview\nThis dashboard breaks the current queueing formula into exact and approximate parts.\n\n- Exact broker-side inputs: `q_rabbitmq_*`\n- Reliable service-capacity inputs: `free_slots_*`, `in_flight_*`, `q_total_*`, `lambda_*`\n- Approximate timing / queueing outputs: `approx_e_s_*`, `approx_mu_*`, `approx_rho_*`\n- Formula components used for path scoring: `approx_backlog_drain_*_seconds`, `approx_kingman_penalty_*_seconds`\n- Unweighted base scores: `approx_score_nmt_seconds`, `approx_score_llm_seconds`\n\nCurrent `telephon` timing `_sum/_count` are reconstructed from rolling averages, so all **Approx** series are operational approximations only. `approx_score_router_seconds` is router-service context and is not part of the fast-vs-heavy route selection formula.",
         "mode": "markdown"
       },
       "title": "Formula Caveats",
@@ -124,6 +124,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "Approximate service and wait-time inputs reconstructed from telephon timing summaries.",
       "fieldConfig": {
         "defaults": {
           "noValue": "No data",
@@ -233,6 +234,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "Approximate backlog-drain and Kingman penalty terms for the NMT fast path and LLM heavy path.",
       "fieldConfig": {
         "defaults": {
           "noValue": "No data",
@@ -260,22 +262,27 @@
       },
       "targets": [
         {
-          "expr": "approx_score_router_seconds",
-          "legendFormat": "Approx router score",
+          "expr": "approx_backlog_drain_nmt_seconds",
+          "legendFormat": "Approx NMT backlog drain",
           "refId": "A"
         },
         {
-          "expr": "approx_score_nmt_seconds",
-          "legendFormat": "Approx nmt score",
+          "expr": "approx_backlog_drain_llm_seconds",
+          "legendFormat": "Approx LLM backlog drain",
           "refId": "B"
         },
         {
-          "expr": "approx_score_llm_seconds",
-          "legendFormat": "Approx llm score",
+          "expr": "approx_kingman_penalty_nmt_seconds",
+          "legendFormat": "Approx NMT Kingman penalty",
           "refId": "C"
+        },
+        {
+          "expr": "approx_kingman_penalty_llm_seconds",
+          "legendFormat": "Approx LLM Kingman penalty",
+          "refId": "D"
         }
       ],
-      "title": "Approx Score",
+      "title": "Approx Backlog Drain And Kingman Terms",
       "type": "timeseries"
     },
     {
@@ -340,6 +347,57 @@
         }
       ],
       "title": "Approx Degradation Indicators",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Approximate unweighted base scores for the NMT and LLM paths plus router-service score context. Router-service score context is not used for fast-vs-heavy path selection.",
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "approx_score_router_seconds",
+          "legendFormat": "Approx router score context",
+          "refId": "A"
+        },
+        {
+          "expr": "approx_score_nmt_seconds",
+          "legendFormat": "Approx NMT base score",
+          "refId": "B"
+        },
+        {
+          "expr": "approx_score_llm_seconds",
+          "legendFormat": "Approx LLM base score",
+          "refId": "C"
+        }
+      ],
+      "title": "Approx Base Scores And Router Context",
       "type": "timeseries"
     }
   ],
