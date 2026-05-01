@@ -49,6 +49,7 @@ def _initialize(config: SimpleNamespace = None):
         _router = get_router(
             models_dir,
             p_llm_threshold=getattr(config, "ROUTER_P_LLM_THRESHOLD", 0.45),
+            p_llm_penalty_alpha=getattr(config, "ROUTER_P_LLM_PENALTY_ALPHA", 0.2),
             overload_enter_rho=getattr(config, "ROUTER_OVERLOAD_ENTER_RHO", 0.8),
             overload_exit_rho=getattr(config, "ROUTER_OVERLOAD_EXIT_RHO", 0.75),
         )
@@ -132,10 +133,24 @@ def run_pipeline(message: bytes, option_fast: str = None, option_quality: str = 
     except Exception as exc:
         logging.exception("Decision metrics emission failed: %s", exc)
 
+    score_fast = getattr(decision, "score_fast", None)
+    score_heavy = getattr(decision, "score_heavy", None)
+    threshold = getattr(decision, "threshold", None)
+
+    if score_fast is not None and score_heavy is not None:
+        decision_detail = (
+            f"score_fast={score_fast:.3f} | "
+            f"score_heavy={score_heavy:.3f}"
+        )
+    elif threshold is not None:
+        decision_detail = f"threshold={threshold:.2f}"
+    else:
+        decision_detail = "threshold=n/a"
+
     # Log decision
     logging.info(
-        f"Routing: {'CASCADE' if decision.use_llm else 'NMT'} | "
-        f"p_llm={decision.p_llm:.3f} | threshold={decision.threshold:.2f} | "
+        f"Routing: {'LLM' if decision.use_llm else 'NMT'} | "
+        f"p_llm={decision.p_llm:.3f} | {decision_detail} | "
         f"mode={decision.mode} | queue={_queue_depth} | "
         f"text='{source_text[:50]}...'"
     )
