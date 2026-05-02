@@ -15,7 +15,7 @@
       },
       "id": 1,
       "options": {
-        "content": "## Router Intelligence Overview\nThese panels show exact router runtime decision signals exported from the experimental branch. No composite complexity score exists in router runtime, so the feature panels below expose exact existing proxies only: `source_length_words`, `log_perplexity`, and `perplexity_per_word`.",
+        "content": "## Router Intelligence Overview\nPrimary routing is now formula-driven on every Prometheus-backed decision.\n\n- Fast path = NMT\n- Heavy path = LLM\n- Heavy path is **not** modeled as `NMT + LLM`\n- The router compares the smaller weighted score using Prometheus base queueing terms plus per-request `p_llm` penalties\n- `approx_score_nmt_seconds` and `approx_score_llm_seconds` are unweighted base scores only\n- Threshold-based routing remains available only when the router falls back to local queue-depth logic\n\nFeature panels below expose exact existing proxies already computed by the router runtime: `source_length_words`, `log_perplexity`, and `perplexity_per_word`.",
         "mode": "markdown"
       },
       "title": "About This Dashboard",
@@ -213,7 +213,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Exact decision totals split by bounded hysteresis mode label.",
+      "description": "Exact decision totals split by runtime routing mode. `formula` is the primary Prometheus-backed path; non-formula modes are local fallback behavior.",
       "fieldConfig": {
         "defaults": {
           "noValue": "No data"
@@ -245,7 +245,7 @@
           "refId": "A"
         }
       ],
-      "title": "Exact Decision Totals By Mode",
+      "title": "Exact Decision Totals By Routing Mode",
       "type": "timeseries"
     },
     {
@@ -258,7 +258,7 @@
       },
       "id": 8,
       "panels": [],
-      "title": "Exact Model Signals",
+      "title": "Primary Formula Inputs And Mode",
       "type": "row"
     },
     {
@@ -309,10 +309,11 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Exact rolling average of thresholds used by the router.",
+      "description": "Share of recent decisions that used the primary formula-driven routing path.",
       "fieldConfig": {
         "defaults": {
-          "noValue": "No data"
+          "noValue": "No data",
+          "unit": "percentunit"
         },
         "overrides": []
       },
@@ -339,12 +340,12 @@
       },
       "targets": [
         {
-          "expr": "router_avg_threshold_5m",
-          "legendFormat": "threshold",
+          "expr": "router_formula_mode_share_5m",
+          "legendFormat": "formula share",
           "refId": "A"
         }
       ],
-      "title": "Exact Avg Threshold 5m",
+      "title": "Formula Mode Share 5m",
       "type": "stat"
     },
     {
@@ -352,10 +353,11 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Exact rolling average of decision margin p_llm - threshold.",
+      "description": "Share of recent decisions that fell back to local queue-depth routing behavior.",
       "fieldConfig": {
         "defaults": {
-          "noValue": "No data"
+          "noValue": "No data",
+          "unit": "percentunit"
         },
         "overrides": []
       },
@@ -382,12 +384,12 @@
       },
       "targets": [
         {
-          "expr": "router_avg_decision_margin_5m",
-          "legendFormat": "margin",
+          "expr": "router_fallback_mode_share_5m",
+          "legendFormat": "fallback share",
           "refId": "A"
         }
       ],
-      "title": "Exact Avg Decision Margin 5m",
+      "title": "Fallback Mode Share 5m",
       "type": "stat"
     },
     {
@@ -395,7 +397,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Exact rolling average of queue-depth input seen by the router at decision time.",
+      "description": "Exact rolling average of queue-depth input retained for fallback routing diagnostics.",
       "fieldConfig": {
         "defaults": {
           "noValue": "No data"
@@ -638,10 +640,11 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Exact path-split comparison of rolling decision-margin averages.",
+      "description": "Approximate unweighted base scores for the NMT fast path and LLM heavy path before router-side `p_llm` weighting.",
       "fieldConfig": {
         "defaults": {
-          "noValue": "No data"
+          "noValue": "No data",
+          "unit": "s"
         },
         "overrides": []
       },
@@ -665,17 +668,17 @@
       },
       "targets": [
         {
-          "expr": "router_avg_decision_margin_fast_5m",
-          "legendFormat": "fast",
+          "expr": "approx_score_nmt_seconds",
+          "legendFormat": "fast base score",
           "refId": "A"
         },
         {
-          "expr": "router_avg_decision_margin_heavy_5m",
-          "legendFormat": "heavy",
+          "expr": "approx_score_llm_seconds",
+          "legendFormat": "heavy base score",
           "refId": "B"
         }
       ],
-      "title": "Exact Avg Decision Margin Fast vs Heavy",
+      "title": "Approx Base Score Fast vs Heavy",
       "type": "timeseries"
     },
     {
@@ -688,7 +691,7 @@
       },
       "id": 20,
       "panels": [],
-      "title": "Decision vs Queue And Load",
+      "title": "Formula Components And Queue State",
       "type": "row"
     },
     {
@@ -696,7 +699,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Overlay exact heavy-path share with existing queue-total metrics.",
+      "description": "Reliable q_total comparison for the NMT fast path and LLM heavy path.",
       "fieldConfig": {
         "defaults": {
           "noValue": "No data"
@@ -723,22 +726,17 @@
       },
       "targets": [
         {
-          "expr": "router_heavy_path_share_5m",
-          "legendFormat": "heavy share",
+          "expr": "q_total_nmt",
+          "legendFormat": "fast q_total",
           "refId": "A"
         },
         {
-          "expr": "q_total_nmt",
-          "legendFormat": "q_total_nmt",
-          "refId": "B"
-        },
-        {
           "expr": "q_total_llm",
-          "legendFormat": "q_total_llm",
-          "refId": "C"
+          "legendFormat": "heavy q_total",
+          "refId": "B"
         }
       ],
-      "title": "Exact Heavy Path Share vs q_total_*",
+      "title": "Reliable q_total Fast vs Heavy",
       "type": "timeseries"
     },
     {
@@ -746,10 +744,11 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Overlay exact p_llm and exact queue-depth input with existing approximate queueing scores.",
+      "description": "Approximate backlog-drain and Kingman penalty terms that feed the unweighted NMT and LLM base scores.",
       "fieldConfig": {
         "defaults": {
-          "noValue": "No data"
+          "noValue": "No data",
+          "unit": "s"
         },
         "overrides": []
       },
@@ -773,27 +772,171 @@
       },
       "targets": [
         {
-          "expr": "router_avg_p_llm_5m",
-          "legendFormat": "avg p_llm",
+          "expr": "approx_backlog_drain_nmt_seconds",
+          "legendFormat": "fast backlog drain",
           "refId": "A"
         },
         {
-          "expr": "router_avg_queue_depth_input_5m",
-          "legendFormat": "avg queue depth input",
+          "expr": "approx_backlog_drain_llm_seconds",
+          "legendFormat": "heavy backlog drain",
           "refId": "B"
         },
         {
-          "expr": "approx_score_nmt_seconds",
-          "legendFormat": "approx_score_nmt_seconds",
+          "expr": "approx_kingman_penalty_nmt_seconds",
+          "legendFormat": "fast Kingman penalty",
           "refId": "C"
         },
         {
-          "expr": "approx_score_llm_seconds",
-          "legendFormat": "approx_score_llm_seconds",
+          "expr": "approx_kingman_penalty_llm_seconds",
+          "legendFormat": "heavy Kingman penalty",
           "refId": "D"
         }
       ],
-      "title": "Exact p_llm / Queue Input vs Existing Approx Scores",
+      "title": "Approx Backlog Drain And Kingman Terms",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 44
+      },
+      "id": 23,
+      "panels": [],
+      "title": "Fallback Diagnostics",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Exact rolling average of fallback thresholds used when Prometheus routing snapshots are unavailable.",
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 45
+      },
+      "id": 24,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "router_avg_threshold_5m",
+          "legendFormat": "threshold",
+          "refId": "A"
+        }
+      ],
+      "title": "Fallback Avg Threshold 5m",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Exact rolling average of fallback decision margin `p_llm - threshold`.",
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 45
+      },
+      "id": 25,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "router_avg_decision_margin_5m",
+          "legendFormat": "margin",
+          "refId": "A"
+        }
+      ],
+      "title": "Fallback Avg Decision Margin 5m",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Exact path-split comparison of fallback decision-margin averages.",
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 45
+      },
+      "id": 26,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "router_avg_decision_margin_fast_5m",
+          "legendFormat": "fast fallback margin",
+          "refId": "A"
+        },
+        {
+          "expr": "router_avg_decision_margin_heavy_5m",
+          "legendFormat": "heavy fallback margin",
+          "refId": "B"
+        }
+      ],
+      "title": "Fallback Decision Margin Fast vs Heavy",
       "type": "timeseries"
     }
   ],

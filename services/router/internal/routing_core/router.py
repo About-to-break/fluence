@@ -18,10 +18,12 @@ class NoneRouterDecisionException(Exception):
 class InternalDecision:
     use_llm: bool
     p_llm: float
-    threshold: float
+    threshold: Optional[float]
     mode: str
     queue_depth: Optional[int]
     features: Dict[str, float]
+    score_fast: Optional[float] = None
+    score_heavy: Optional[float] = None
     timestamp: float = field(default_factory=time.time)
 
 
@@ -33,6 +35,7 @@ class HysteresisRouter:
         model_path: str,
         *,
         p_llm_threshold: float = 0.45,
+        p_llm_penalty_alpha: float = 0.2,
         overload_enter_rho: float = 0.8,
         overload_exit_rho: float = 0.75,
     ):
@@ -60,8 +63,13 @@ class HysteresisRouter:
         }
 
         self.current_mode = 'normal'
-        self.routing_mode = 'healthy'
+        self.routing_mode = 'formula'
         self.p_llm_threshold = float(p_llm_threshold)
+        self.p_llm_penalty_alpha = float(p_llm_penalty_alpha)
+        if self.p_llm_penalty_alpha < 0:
+            self.p_llm_penalty_alpha = 0.0
+        # Preserved for backward-compatible config parsing. The primary
+        # Prometheus-backed routing path now uses the continuous PDF formula.
         self.overload_enter_rho = max(float(overload_enter_rho), 0.0)
         self.overload_exit_rho = max(float(overload_exit_rho), 0.0)
         if self.overload_exit_rho > self.overload_enter_rho:
@@ -113,36 +121,24 @@ class HysteresisRouter:
         self.update_mode(queue_depth)
         return self.thresholds[self.current_mode]
 
-    def update_routing_mode(self, routing_snapshot: RoutingMetricsSnapshot) -> str:
-        prev_mode = self.routing_mode
-        system_rho = routing_snapshot.system_rho
+    def _compute_formula_scores(
+        self,
+        p_llm: float,
+        routing_snapshot: RoutingMetricsSnapshot,
+    ) -> tuple[float, float]:
+        w_fast = 1.0 + self.p_llm_penalty_alpha * p_llm
+        w_heavy = 1.0 + self.p_llm_penalty_alpha * (1.0 - p_llm)
 
-        if self.routing_mode == 'healthy':
-            if system_rho >= self.overload_enter_rho:
-                self.routing_mode = 'overloaded'
-        elif self.routing_mode == 'overloaded':
-            if system_rho <= self.overload_exit_rho:
-                self.routing_mode = 'healthy'
+        score_fast = (
+            routing_snapshot.backlog_drain_nmt_seconds
+            + w_fast * routing_snapshot.kingman_penalty_nmt_seconds
+        )
+        score_heavy = (
+            routing_snapshot.backlog_drain_llm_seconds
+            + w_heavy * routing_snapshot.kingman_penalty_llm_seconds
+        )
 
-        if prev_mode != self.routing_mode:
-            self.mode_history.append({
-                'timestamp': time.time(),
-                'from_mode': prev_mode,
-                'to_mode': self.routing_mode,
-                'system_rho': system_rho,
-                'rho_nmt': routing_snapshot.rho_nmt,
-                'rho_llm': routing_snapshot.rho_llm,
-                'source': 'prometheus',
-            })
-            self.stats['mode_changes'] += 1
-            logger.warning(
-                "Routing mode changed: %s -> %s (system_rho=%.3f)",
-                prev_mode,
-                self.routing_mode,
-                system_rho,
-            )
-
-        return self.routing_mode
+        return score_fast, score_heavy
 
     def should_use_llm(
         self,
@@ -155,16 +151,16 @@ class HysteresisRouter:
         p_llm = self.model.predict_proba(X)[0, 1]
 
         if routing_snapshot is not None:
-            mode = self.update_routing_mode(routing_snapshot)
-            threshold = self.p_llm_threshold
-            if mode == 'healthy':
-                use_llm = p_llm >= threshold
-            else:
-                use_llm = routing_snapshot.score_llm <= routing_snapshot.score_nmt
+            mode = self.routing_mode
+            threshold = None
+            score_fast, score_heavy = self._compute_formula_scores(p_llm, routing_snapshot)
+            use_llm = score_heavy <= score_fast
         else:
             threshold = self.get_threshold(queue_depth)
             use_llm = p_llm > threshold
             mode = self.current_mode
+            score_fast = None
+            score_heavy = None
 
         self.stats['total_requests'] += 1
         if use_llm:
@@ -178,7 +174,9 @@ class HysteresisRouter:
             threshold=threshold,
             mode=mode,
             queue_depth=queue_depth,
-            features=features
+            features=features,
+            score_fast=score_fast,
+            score_heavy=score_heavy,
         )
 
     def get_stats(self) -> Dict[str, Any]:
@@ -201,6 +199,7 @@ def get_router(
     models_dir: str = None,
     *,
     p_llm_threshold: float = 0.45,
+    p_llm_penalty_alpha: float = 0.2,
     overload_enter_rho: float = 0.8,
     overload_exit_rho: float = 0.75,
 ) -> HysteresisRouter:
@@ -217,6 +216,7 @@ def get_router(
             config_path,
             model_path,
             p_llm_threshold=p_llm_threshold,
+            p_llm_penalty_alpha=p_llm_penalty_alpha,
             overload_enter_rho=overload_enter_rho,
             overload_exit_rho=overload_exit_rho,
         )

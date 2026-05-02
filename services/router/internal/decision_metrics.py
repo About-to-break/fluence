@@ -8,7 +8,7 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 _ALLOWED_PATHS = ("fast", "heavy")
-_ALLOWED_MODES = ("low", "normal", "high", "critical", "healthy", "overloaded")
+_ALLOWED_MODES = ("low", "normal", "high", "critical", "healthy", "overloaded", "formula")
 _SUMMARY_METRICS = (
     ("p_llm", "router_decision_p_llm", "Exact p_llm observations"),
     ("threshold", "router_decision_threshold", "Exact threshold observations"),
@@ -160,7 +160,7 @@ class SafeDecisionMetricsCollector:
             }
 
         lines = [
-            "# HELP router_decision_total Exact router decisions by semantic path and hysteresis mode",
+            "# HELP router_decision_total Exact router decisions by semantic path and routing mode",
             "# TYPE router_decision_total counter",
         ]
         for path in _ALLOWED_PATHS:

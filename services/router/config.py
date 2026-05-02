@@ -115,6 +115,10 @@ def load_config(env_file=".env") -> SimpleNamespace:
         config_vars.get("ROUTER_P_LLM_THRESHOLD"),
         0.45,
     )
+    config_vars["ROUTER_P_LLM_PENALTY_ALPHA"] = _to_float(
+        config_vars.get("ROUTER_P_LLM_PENALTY_ALPHA"),
+        0.2,
+    )
     config_vars["ROUTER_OVERLOAD_ENTER_RHO"] = _to_float(
         config_vars.get("ROUTER_OVERLOAD_ENTER_RHO"),
         0.8,

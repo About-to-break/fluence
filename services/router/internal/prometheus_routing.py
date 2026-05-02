@@ -15,8 +15,10 @@ logger = logging.getLogger(__name__)
 class RoutingMetricsSnapshot:
     rho_nmt: float
     rho_llm: float
-    score_nmt: float
-    score_llm: float
+    backlog_drain_nmt_seconds: float
+    backlog_drain_llm_seconds: float
+    kingman_penalty_nmt_seconds: float
+    kingman_penalty_llm_seconds: float
 
     @property
     def system_rho(self) -> float:
@@ -27,8 +29,10 @@ class PrometheusRoutingClient:
     _EXPECTED_SERIES = {
         "approx_rho_nmt": ("rho_nmt", "nmt"),
         "approx_rho_llm": ("rho_llm", "llm"),
-        "approx_score_nmt_seconds": ("score_nmt", "nmt"),
-        "approx_score_llm_seconds": ("score_llm", "llm"),
+        "approx_backlog_drain_nmt_seconds": ("backlog_drain_nmt_seconds", "nmt"),
+        "approx_backlog_drain_llm_seconds": ("backlog_drain_llm_seconds", "llm"),
+        "approx_kingman_penalty_nmt_seconds": ("kingman_penalty_nmt_seconds", "nmt"),
+        "approx_kingman_penalty_llm_seconds": ("kingman_penalty_llm_seconds", "llm"),
     }
     QUERY = " or ".join(
         f'{series_name}{{service="{service}"}}'
@@ -124,7 +128,7 @@ class PrometheusRoutingClient:
                 raise ValueError(f"Prometheus query returned unexpected series {series_name!r}")
 
             field_name, service_name = self._EXPECTED_SERIES[series_name]
-            if metric.get("service") not in (None, service_name):
+            if metric.get("service") != service_name:
                 raise ValueError(f"Prometheus query returned unexpected labels for {series_name!r}")
             if field_name in parsed_values:
                 raise ValueError(f"Prometheus query returned duplicate series {series_name!r}")
@@ -152,6 +156,8 @@ class PrometheusRoutingClient:
         return RoutingMetricsSnapshot(
             rho_nmt=parsed_values["rho_nmt"],
             rho_llm=parsed_values["rho_llm"],
-            score_nmt=parsed_values["score_nmt"],
-            score_llm=parsed_values["score_llm"],
+            backlog_drain_nmt_seconds=parsed_values["backlog_drain_nmt_seconds"],
+            backlog_drain_llm_seconds=parsed_values["backlog_drain_llm_seconds"],
+            kingman_penalty_nmt_seconds=parsed_values["kingman_penalty_nmt_seconds"],
+            kingman_penalty_llm_seconds=parsed_values["kingman_penalty_llm_seconds"],
         )
