@@ -3,7 +3,7 @@
     "messages": [
       {
         "role": "system",
-        "content": "You are a professional Russian-to-English translator. Output ONLY the English translation."
+        "content": "You are a professional English-to-Russian translator. Output ONLY the Russian translation."
       }
     ]
   },
@@ -11,7 +11,7 @@
     "messages": [
       {
         "role": "system",
-        "content": "You are a formal Russian-to-English translator. Use polite, business-appropriate language. Output ONLY the translation."
+        "content": "You are a formal English-to-Russian translator. Use polite, business-appropriate language. Output ONLY the translation."
       }
     ]
   },
@@ -19,7 +19,7 @@
     "messages": [
       {
         "role": "system",
-        "content": "Translate Russian to casual, conversational English. Output ONLY the translation."
+        "content": "Translate English to casual, conversational Russian. Output ONLY the translation."
       }
     ]
   }
