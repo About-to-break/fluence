@@ -15,7 +15,7 @@
       },
       "id": 1,
       "options": {
-        "content": "## LLM Overview\nThis dashboard must remain usable even when `llm_translator` is not running. In that case, LLM service panels should show **No data** while RabbitMQ queue context remains visible.\n\n`q.out_gateway` is shown only as downstream context, not as a main formula input.",
+        "content": "## LLM Overview\nThis dashboard must remain usable even when `llm_translator` is not running. In that case, LLM service panels should show **No data** while RabbitMQ queue context remains visible.\n\nHeavy path = LLM only. `approx_score_llm_seconds` is the unweighted LLM base score before router-side `p_llm` weighting. `q.out_gateway` is shown only as downstream context, not as a main formula input.",
         "mode": "markdown"
       },
       "title": "About This Dashboard",
@@ -580,12 +580,12 @@
       },
       "targets": [
         {
-          "expr": "approx_e_s_llm_seconds",
+          "expr": "approx_backlog_drain_llm_seconds",
           "legendFormat": "llm",
           "refId": "A"
         }
       ],
-      "title": "Approx E[S] LLM",
+      "title": "Approx Backlog Drain LLM",
       "type": "stat"
     },
     {
@@ -596,7 +596,7 @@
       "fieldConfig": {
         "defaults": {
           "noValue": "No data",
-          "unit": "ops"
+          "unit": "s"
         },
         "overrides": []
       },
@@ -623,12 +623,12 @@
       },
       "targets": [
         {
-          "expr": "approx_mu_llm",
+          "expr": "approx_kingman_penalty_llm_seconds",
           "legendFormat": "llm",
           "refId": "A"
         }
       ],
-      "title": "Approx Mu LLM",
+      "title": "Approx Kingman Penalty LLM",
       "type": "stat"
     },
     {
@@ -732,7 +732,7 @@
           "refId": "A"
         }
       ],
-      "title": "Approx Score LLM",
+      "title": "Approx Base Score LLM",
       "type": "stat"
     },
     {

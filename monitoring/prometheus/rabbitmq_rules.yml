@@ -116,14 +116,26 @@ groups:
       - record: approx_rho_llm
         expr: (lambda_llm_rps * approx_e_s_llm_seconds) / clamp_min(max_concurrent_llm, 1)
 
+      - record: approx_backlog_drain_nmt_seconds
+        expr: (q_total_nmt / clamp_min(approx_mu_nmt, 1e-9)) * on(service) (approx_mu_nmt > bool 0)
+
+      - record: approx_backlog_drain_llm_seconds
+        expr: (q_total_llm / clamp_min(approx_mu_llm, 1e-9)) * on(service) (approx_mu_llm > bool 0)
+
+      - record: approx_kingman_penalty_nmt_seconds
+        expr: ((1 / clamp_min(approx_mu_nmt, 1e-9)) * (approx_rho_nmt / clamp_min(1 - approx_rho_nmt, 0.01))) * on(service) (approx_mu_nmt > bool 0)
+
+      - record: approx_kingman_penalty_llm_seconds
+        expr: ((1 / clamp_min(approx_mu_llm, 1e-9)) * (approx_rho_llm / clamp_min(1 - approx_rho_llm, 0.01))) * on(service) (approx_mu_llm > bool 0)
+
       - record: approx_score_router_seconds
         expr: ((q_total_router + approx_rho_router) / clamp_min(approx_mu_router * clamp_min(1 - approx_rho_router, 0.01), 1e-9)) * on(service) (approx_mu_router > bool 0)
 
       - record: approx_score_nmt_seconds
-        expr: ((q_total_nmt + approx_rho_nmt) / clamp_min(approx_mu_nmt * clamp_min(1 - approx_rho_nmt, 0.01), 1e-9)) * on(service) (approx_mu_nmt > bool 0)
+        expr: approx_backlog_drain_nmt_seconds + approx_kingman_penalty_nmt_seconds
 
       - record: approx_score_llm_seconds
-        expr: ((q_total_llm + approx_rho_llm) / clamp_min(approx_mu_llm * clamp_min(1 - approx_rho_llm, 0.01), 1e-9)) * on(service) (approx_mu_llm > bool 0)
+        expr: approx_backlog_drain_llm_seconds + approx_kingman_penalty_llm_seconds
 
       - record: approx_wait_to_service_ratio_router
         expr: approx_e_w_router_seconds / clamp_min(approx_e_s_router_seconds, 1e-9)
