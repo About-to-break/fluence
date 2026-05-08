@@ -66,9 +66,9 @@ async def serve():
                 metrics_server.record_request_start()
                 try:
                     result = await active_pipeline(
-                        vllm_connector,
-                        config.OPENAI_API_MAX_TOKENS,
-                        message.body
+                        connector=vllm_connector,
+                        max_tokens=config.OPENAI_API_MAX_TOKENS,
+                        message=message.body
                     )
 
                     await producer.produce(result)
@@ -108,7 +108,7 @@ async def serve():
                     logging.exception(f"Unexpected error, requeue: {e2}")
                     await message.nack(requeue=True)
                     raise
-
+                # Добавить отлов ошибки если нету uuid
         # ========== FIRE-AND-FORGET ОБЁРТКА ==========
         async def background_handler(message, t_arr):
             """Запускает handler в фоне, не дожидаясь результата."""
