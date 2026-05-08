@@ -67,7 +67,7 @@ async def serve():
 
         active_pipeline = pipeline.get_pipeline(config, executor=translation_executor,
                                                 max_batch_size=int(config.BATCHER_MAX_BATCH_SIZE),
-                                                max_wait=float(config.BATCHER_MAX_WAIT / 1000),)
+                                                max_wait=float(config.BATCHER_MAX_WAIT) / 1000,)
         broker = queue_manager.get_broker(config)
         producer = broker["producer"]
         consumer = broker["consumer"]
