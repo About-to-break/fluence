@@ -32,7 +32,7 @@ class CT2Translator:
             src_lang: str,
             device: str = "cuda",
             compute_type: str = "float16",
-            intra_threads: int = 8,
+            intra_threads: int = 1, # не трогать
             inter_threads: int = 1,
     ):
         self.model_path = model_path

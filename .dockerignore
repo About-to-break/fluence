@@ -1,0 +1,8 @@
+.env
+.example.env
+Makefile
+README.md
+init-env.ps1
+LICENSE
+
+**/*.env

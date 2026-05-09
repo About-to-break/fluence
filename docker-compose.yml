@@ -90,7 +90,7 @@ services:
       dockerfile: Dockerfile.machine_translator
     container_name: nmt_translator
     env_file:
-      - .env
+      - services/machine_translator/.env
     ports:
       - "9090:9090"
     restart: unless-stopped
@@ -111,7 +111,7 @@ services:
         dockerfile: Dockerfile.llm_translator
       container_name: llm_translator
       env_file:
-        - .env
+        - services/llm_translator/.env
       ports:
         - "9091:9090"
       restart: unless-stopped
