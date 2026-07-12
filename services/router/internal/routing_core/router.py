@@ -148,7 +148,7 @@ class HysteresisRouter:
     ) -> InternalDecision:
         X = np.array([[features.get(name, 0) for name in self.feature_names]])
 
-        p_llm = self.model.predict_proba(X)[0, 1]
+        p_llm = float(self.model.predict(X)[0])
 
         if routing_snapshot is not None:
             mode = self.routing_mode
@@ -209,8 +209,8 @@ def get_router(
         if models_dir is None:
             models_dir = os.path.join(os.path.dirname(__file__), 'models')
 
-        config_path = os.path.join(models_dir, 'router_config_xgb.json')
-        model_path = os.path.join(models_dir, 'router_classifier_xgb.joblib')
+        config_path = os.path.join(models_dir, 'router_config_xgb_regressor.json')
+        model_path = os.path.join(models_dir, 'router_regressor_xgb.pkl')
 
         _router = HysteresisRouter(
             config_path,

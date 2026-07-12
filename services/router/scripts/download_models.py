@@ -4,10 +4,11 @@ import urllib.request
 import zipfile
 import tempfile
 import shutil
+import time
 from huggingface_hub import hf_hub_download
 
 # ===== ПРЯМАЯ ССЫЛКА НА АРХИВ =====
-RELEASE_URL = "https://github.com/MeLver0/sum/releases/download/Release/adaptive_router_models_v1.0.0.zip"
+RELEASE_URL = "https://github.com/MeLver0/sum/releases/download/rel4/adaptive_router_models_v1.1.0.zip"
 
 # ===== HUGGING FACE KENLM =====
 HF_REPO_ID = "BramVanroy/kenlm_wikipedia_en"
@@ -20,21 +21,20 @@ MODELS_DIR = os.path.join(ROUTING_CORE, 'models')
 DATA_DIR = os.path.join(ROUTING_CORE, 'data')
 
 
-def download_with_progress(url, dest_path, description):
-    print(f"Downloading {description}...")
-    print(f"  URL: {url}")
-
-    def progress_hook(block_num, block_size, total_size):
-        downloaded = block_num * block_size
-        if total_size > 0:
-            percent = min(100, downloaded * 100 / total_size)
-            mb_downloaded = downloaded / (1024 * 1024)
-            mb_total = total_size / (1024 * 1024)
-            sys.stdout.write(f"\r  Progress: {percent:.1f}% ({mb_downloaded:.1f}/{mb_total:.1f} MB)")
-            sys.stdout.flush()
-
-    urllib.request.urlretrieve(url, dest_path, reporthook=progress_hook)
-    print("\n Done!")
+def download_with_retry(url, dest_path, description, retries=3):
+    """Скачивает файл с повторными попытками."""
+    for attempt in range(1, retries + 1):
+        try:
+            print(f"Downloading {description} (attempt {attempt})...")
+            urllib.request.urlretrieve(url, dest_path)
+            print(" Done!")
+            return
+        except Exception as e:
+            print(f"Attempt {attempt} failed: {e}")
+            if attempt < retries:
+                time.sleep(5)
+            else:
+                raise
 
 
 def download_kenlm():
@@ -52,7 +52,7 @@ def download_kenlm():
         model_path = hf_hub_download(
             repo_id=HF_REPO_ID,
             filename=HF_FILENAME,
-            cache_dir=os.path.join(DATA_DIR, 'hf_cache')
+            cache_dir=tempfile.gettempdir(),
         )
         shutil.copy(model_path, dest_path)
         print(f"KenLM saved to: {dest_path}")
@@ -62,25 +62,24 @@ def download_kenlm():
 
 
 def main():
-
     os.makedirs(MODELS_DIR, exist_ok=True)
     os.makedirs(DATA_DIR, exist_ok=True)
 
     # 1. KenLM с Hugging Face
     download_kenlm()
 
-    # 2. XGBoost и конфиг из твоего Release
-    xgb_path = os.path.join(MODELS_DIR, 'router_classifier_xgb.joblib')
-    config_path = os.path.join(MODELS_DIR, 'router_config_xgb.json')
+    # 2. Модель, конфиг и центроиды из Release
+    xgb_path = os.path.join(MODELS_DIR, 'router_regressor_xgb.pkl')
+    config_path = os.path.join(MODELS_DIR, 'router_config_xgb_regressor.json')
+    centroids_path = os.path.join(DATA_DIR, 'labse_centroids.pkl')
 
-    if os.path.exists(xgb_path) and os.path.exists(config_path):
-        print("XGBoost model and config already exist")
-    else:
+    # Загружаем архив, если хотя бы одного файла нет
+    if not (os.path.exists(xgb_path) and os.path.exists(config_path) and os.path.exists(centroids_path)):
         with tempfile.TemporaryDirectory() as tmpdir:
             archive_path = os.path.join(tmpdir, "models.zip")
 
             try:
-                download_with_progress(RELEASE_URL, archive_path, "model archive")
+                download_with_retry(RELEASE_URL, archive_path, "model archive")
             except Exception as e:
                 print(f"\nFailed to download: {e}")
                 print(f"\nPlease download manually from:")
@@ -94,16 +93,23 @@ def main():
 
                 for root, dirs, files in os.walk(extract_dir):
                     for file in files:
-                        if file == 'router_classifier_xgb.joblib':
-                            src = os.path.join(root, file)
+                        src = os.path.join(root, file)
+                        if file == 'router_regressor_xgb.pkl':
                             shutil.copy2(src, xgb_path)
-                            print(f"XGBoost model: {xgb_path}")
-                        elif file == 'router_config_xgb.json':
-                            src = os.path.join(root, file)
+                            print(f"Regressor model: {xgb_path}")
+                        elif file == 'router_config_xgb_regressor.json':
                             shutil.copy2(src, config_path)
                             print(f"Config: {config_path}")
+                        elif file == 'labse_centroids.pkl':
+                            shutil.copy2(src, centroids_path)
+                            print(f"Centroids: {centroids_path}")
 
-
+        # Дополнительная проверка, что центроиды действительно появились
+        if not os.path.exists(centroids_path):
+            print("ERROR: labse_centroids.pkl was not extracted from the archive!")
+            sys.exit(1)
+    else:
+        print("All model files already exist.")
 
 
 if __name__ == "__main__":

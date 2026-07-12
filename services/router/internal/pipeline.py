@@ -12,12 +12,11 @@ from . import decision_metrics
 from .prometheus_queue_depth import PrometheusQueueDepthClient
 from .prometheus_routing import PrometheusRoutingClient, RoutingMetricsSnapshot
 
-# Импорты из routing_core
-from .routing_core.features import FeatureExtractor
+from .routing_core.features import extract_features, _init_models
 from .routing_core.router import get_router, HysteresisRouter
 
-# Глобальные объекты (инициализируются один раз)
-_extractor: FeatureExtractor = None
+# Глобальные объекты (инициализируются один раз в _initialize)
+_extractor = None
 _router: HysteresisRouter = None
 _queue_depth: int = 0
 _prometheus_queue_depth_client: PrometheusQueueDepthClient | None = None
@@ -39,13 +38,14 @@ def _initialize(config: SimpleNamespace = None):
     global _extractor, _router, _queue_depth, _prometheus_queue_depth_client, _prometheus_routing_client
 
     if _extractor is None:
-        # Пути к моделям
         routing_core_dir = os.path.dirname(os.path.abspath(__file__))
         models_dir = os.path.join(routing_core_dir, 'routing_core', 'models')
         data_dir = os.path.join(routing_core_dir, 'routing_core', 'data')
 
-        kenlm_path = os.path.join(data_dir, 'kenlm_wiki_en.bin')
-        _extractor = FeatureExtractor(kenlm_path)
+        # Инициализируем модели (LaBSE, центроиды, KenLM)
+        _init_models(data_dir)
+        _extractor = extract_features   # теперь это функция
+
         _router = get_router(
             models_dir,
             p_llm_threshold=getattr(config, "ROUTER_P_LLM_THRESHOLD", 0.45),
@@ -54,7 +54,6 @@ def _initialize(config: SimpleNamespace = None):
             overload_exit_rho=getattr(config, "ROUTER_OVERLOAD_EXIT_RHO", 0.75),
         )
 
-        # Установить начальную глубину очереди из конфига
         if config and hasattr(config, 'QUEUE_DEPTH_STATIC'):
             _queue_depth = int(config.QUEUE_DEPTH_STATIC)
         if config and getattr(config, "PROMETHEUS_ENABLED", False):
@@ -111,7 +110,7 @@ def run_pipeline(message: bytes, option_fast: str = None, option_quality: str = 
     # Extract features
     t_features = time.time()
     try:
-        features = _extractor.extract(source_text)
+        features = _extractor(source_text)
     except Exception as e:
         logging.error(f"Feature extraction failed: {e}")
         raise NoneRouterDecisionException(f"Feature extraction error: {e}")
@@ -147,7 +146,6 @@ def run_pipeline(message: bytes, option_fast: str = None, option_quality: str = 
     else:
         decision_detail = "threshold=n/a"
 
-    # Log decision
     logging.info(
         f"Routing: {'LLM' if decision.use_llm else 'NMT'} | "
         f"p_llm={decision.p_llm:.3f} | {decision_detail} | "
@@ -157,7 +155,6 @@ def run_pipeline(message: bytes, option_fast: str = None, option_quality: str = 
 
     logging.debug(f"TOTAL: {(time.time() - t_total) * 1000:.2f} ms")
 
-    # Return appropriate routing key
     if decision.use_llm:
         return option_quality or option_fast
     else:
@@ -183,7 +180,6 @@ def run_test_pipeline(message: bytes, option_fast: str = None, option_quality: s
 
 def get_pipeline(config: SimpleNamespace):
     """Get pipeline function based on config."""
-    # Инициализируем с конфигом
     _initialize(config)
 
     if config.PIPELINE == "prod":

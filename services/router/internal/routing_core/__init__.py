@@ -1,2 +1,2 @@
 from .router import HysteresisRouter
-from .features import FeatureExtractor
+from .features import extract_features, _init_models
